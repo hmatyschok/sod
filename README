@@ -1,0 +1,48 @@
+Simple sign-on service on demand daemon (sod)
+=============================================
+
+Environment: FreeBSD 10.1-RELEASE
+
+WARNING: This software is WRITTEN from SCRATCH during a rapid
+WARNING: developement session and contains some (serious FLAWS).
+
+This daemon provides (due to its early implementation status) only simple 
+user authentication. All with pam(8) subsystem collaborating components are 
+utilizing pthread(3) API throught an experimental approach to develope an 
+object oriented Service Component Architechture (SCA) providing an interface 
+for the backend of web-applications (or other funny things).
+
+Further, communication between backend and pam(8) is provided by using socket 
+API. Transactions are mapped in AF_UNIX domain. See by unix(4) denoted manual 
+page for further details.
+
+ -> https://www.freebsd.org/cgi/man.cgi?query=unix&manpath=FreeBSD+9.3-stable
+
+This provides a strict isolation between the domain of given backend 
+and pam(8) subsystem. 
+
+ -> https://www.freebsd.org/cgi/man.cgi?query=pam&manpath=FreeBSD+9.3-stable
+
+Now, it is up to the pam(8) subsystem to handle (or forward) service requests 
+targeting local user data base (not recommondated, but possible - self 
+explanatory) or to remote sites managing user credentials.
+
+Further, the present implementation is far from completeness and correctness.
+
+Current raw developement roadmap:
+---------------------------------
+
+ 1. Structural reorganisation of given set of Makefiles. :-) 
+  
+ 2. Activities in regarding to adding more  components around user
+    authentication services are still underway and in progress.
+
+ 3. An experimental lightwight user session model based on db(3) API 
+    and access to other pam(3) service facilities are current issues.
+
+ 4. Complete reorganisation of given library into a group of libraries.
+    Any component will be redefined as single library.
+ 
+ 5. Implementation of a JNI still encapsulating authentication 
+    requests is planned for demonstration purposes.
+
