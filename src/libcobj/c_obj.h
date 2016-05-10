@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 Henning Matyschok
+ * Copyright (c) 2015, 2016 Henning Matyschok
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,25 +25,57 @@
  * version=0.1 
  */
 
-/*
- * Public, Service Primitives (SPI).
- */
+#include <sys/types.h>
 
-typedef int 	(*libsod_conv_include_t)(void *);
-typedef void 	(*libsod_conv_exclude_t)(void);
+#include <pthread.h>
+#include <unistd.h>
 
-typedef void (*sod_create_conv_t)(int);
 
-#define LIB_SOD_CONV_INIT 	"sod_thr_init"
-#define LIB_SOD_CONV_FINI 	"sod_thr_fini"
-#define LIB_SOD_CREATE_CONV 	"sod_create_conv"
+typedef void *	(*c_start_t)(void *);
+typedef int 	(*c_init_t)(void *);
+typedef int 	(*c_add_t)(void *);
+typedef int 	(*c_del_t)(void *);
 
-extern int 	libsod_conv_include(void *);
-extern void 	libsod_conv_exclude(void);
-extern void 	sod_create_conv(void *);
+typedef void *	(*c_create_t)(void *, c_start_t);
+typedef int 	(*c_destroy_t)(void *, void *);
 
-struct sod_conv_args {
-	struct sod_header 	sca_h;
-	int 	sca_client;
-	int 	sca_srv;
+struct c_methods {
+	c_init_t 		cm_init;
+	c_add_t 		cm_add;
+	c_del_t 		cm_del;
+	c_create_t 		cm_create;
+	c_free_t 		cm_free;
 };
+
+/*
+ * c_cookie = $( date -u '+%s' )
+ */
+struct c_obj {
+	long 	c_cookie; 	/* identifier */
+	size_t 	c_size;
+	
+	TAILQ_NEXT(c_obj) c_next;
+};
+TAILQ_HEAD(c_obj_hd, c_obj);
+
+struct c_cache {
+	struct c_obj_hd 	ch_hd;
+	DB 	*ch_db;
+};
+
+/*
+ * By pthread(3) covered instance.
+ */
+struct c_thr {
+	struct c_obj 	c_obj;
+	
+	pthread_cond_t 	c_cv;
+	pthread_mutex_t 	c_mtx;
+	pthread_t 	c_tid;
+};
+
+__BEGIN_DECLS
+struct c_methods * 	c_base_class_init(void);
+int 	c_base_class_free(void);
+__END_DECLS
+

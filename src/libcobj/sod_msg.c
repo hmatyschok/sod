@@ -43,7 +43,7 @@
  * Allocates n message primitives.
  */ 
 struct sod_buf * 
-sod_alloc_msg(size_t n)
+sod_msg_alloc(size_t n)
 {
 	struct sod_buf *sb = NULL;
 	
@@ -57,7 +57,7 @@ sod_alloc_msg(size_t n)
  * Fills message buffer with attributes, if any.
  */
 void 
-sod_prepare_msg(const char *s, uint32_t code, void *thr, struct sod_buf *sb)
+sod_msg_prepare(const char *s, uint32_t code, void *thr, struct sod_buf *sb)
 {
 	struct sod_header *sh = NULL;
 	
@@ -79,7 +79,7 @@ sod_prepare_msg(const char *s, uint32_t code, void *thr, struct sod_buf *sb)
  * Wrapper for sendmsg(2).
  */
 ssize_t 
-sod_send_msg(int s, struct msghdr *msg, int flags)
+sod_msg_send(int s, struct msghdr *msg, int flags)
 {
 	return (sendmsg(s, msg, flags));
 }
@@ -88,7 +88,7 @@ sod_send_msg(int s, struct msghdr *msg, int flags)
  * Wrapper for recvmsg(2).
  */
 ssize_t 
-sod_recv_msg(int s, struct msghdr *msg, int flags)
+sod_msg_recv(int s, struct msghdr *msg, int flags)
 {
 	return (recvmsg(s, msg, flags));
 }
@@ -97,7 +97,7 @@ sod_recv_msg(int s, struct msghdr *msg, int flags)
  * Performs MPI exchange via callback.  
  */
 int
-sod_handle_msg(sod_msg_t sod_msg, int s, struct sod_buf *sb)
+sod_msg_handle(sod_msg_t sod_msg, int s, struct sod_buf *sb)
 {
 	int eval = -1;
 	ssize_t len;
@@ -113,7 +113,7 @@ sod_handle_msg(sod_msg_t sod_msg, int s, struct sod_buf *sb)
 	if ((len = sizeof(*sb)) != SOD_BUF_LEN)
 		goto out;
 
-	if (sod_msg == sod_recv_msg || sod_msg == sod_send_msg) {
+	if (sod_msg == sod_msg_recv || sod_msg == sod_msg_send) {
 		vec.iov_base = sb;
 		vec.iov_len = len;
 	

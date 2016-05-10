@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 Henning Matysphok
+ * Copyright (c) 2015, 2016 Henning Matysphok
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,12 +45,12 @@
  */
 
 #include <sod_msg.h>
-#include <sod_conv.h>
+#include <auth_provider.h>
 
 static pid_t 	pid;
 static pthread_t 	tid;
 
-static struct sod_conv_args sca = { 0 };
+static struct auth_provider_arg apa = { 0 };
 
 static char *cmd; 
 
@@ -60,6 +60,8 @@ static const char *sock_file = SOD_SOCK_FILE;
 
 static char 	lock_file[PATH_MAX + 1];
 static struct sockaddr_storage 	sap;
+
+static struct c_class *root;
 
 static void 	sod_errx(int, const char *, ...);
 static void 	sod_atexit(void);
@@ -93,14 +95,17 @@ sod_atexit(void)
 static void *
 sod_sigaction(void *arg)
 {
-	struct sod_header *sh = NULL;
+	sigset_t sigset
 	int sig;
+	
+	if (sigfillset(&sigset) < 0)
+		sod_errx(EX_OSERR, "Can't initialize signal set");
 
-	if ((sh = arg) == NULL) 
-		goto out;
+	if (pthread_sigmask(SIG_BLOCK, &sisgset, NULL) != 0)
+		sod_errx(EX_OSERR, "Can't apply modefied signal set");
 		
 	for (;;) {
-		if (sigwait(&sh->sh_mask, &sig) != 0)
+		if (sigwait(&sigset, &sig) != 0)
 			sod_errx(EX_OSERR, "Can't select signal set");
 
 		switch (sig) {
@@ -127,17 +132,18 @@ main(int argc, char **argv)
 	struct sigaction sa;
 	struct sockaddr_un *sun;
 	size_t len;
+	int fd , flags;
 	
 	if (getuid() != 0)
 		sod_errx(EX_NOPERM, "%s", strerror(EPERM));	 
 	
-	if ((sca.sca_srv = open(pid_file, O_RDWR, 0640)) > -1) 
+	if ((fd = open(pid_file, O_RDWR, 0640)) > -1) 
 		sod_errx(EX_OSERR, "Daemon already running");	
 		
-	cmd = argv[sca.sca_srv];
+	cmd = argv[fd];
 	
 	openlog(cmd, LOG_CONS, LOG_DAEMON);
-	sca.sca_h.sh_flags |= SOD_SYSLOG;	
+	flags = SOD_SYSLOG;	
 /*
  * Disable hang-up signal.
  */
@@ -182,29 +188,25 @@ main(int argc, char **argv)
 	if (sigaction(SIGHUP, &sa, NULL) < 0)
 		sod_errx(EX_OSERR, "Can't disable SIGHUP");
 	
-	if (sigfillset(&sca.sca_h.sh_mask) < 0)
-		sod_errx(EX_OSERR, "Can't initialize signal set");
-
-	if (pthread_sigmask(SIG_BLOCK, &sca.sca_h.sh_mask, NULL) != 0)
-		sod_errx(EX_OSERR, "Can't apply modefied signal set");
-
-	if (pthread_create(&tid, NULL, sod_sigaction, &sca) != 0)
+	if (pthread_create(&tid, NULL, sod_sigaction, NULL) != 0)
 		sod_errx(EX_OSERR, "Can't initialize signal handler");
 /*
  * Create SOD_PID_FILE (lockfile).
  */		
 	(void)unlink(pid_file);
 		
-	if ((sca.sca_srv = open(pid_file, O_RDWR|O_CREAT, 0640)) < 0)
+	if ((fd = open(pid_file, O_RDWR|O_CREAT, 0640)) < 0)
 		sod_errx(EX_OSERR, "Can't open %s", pid_file);
 
-	if (lockf(sca.sca_srv, F_TLOCK, 0) < 0)
+	if (lockf(fd, F_TLOCK, 0) < 0)
 		sod_errx(EX_OSERR, "Can't lock %s", pid_file);
 
 	(void)snprintf(lock_file, PATH_MAX, "%d\n", getpid());
 
-	if (write(sca.sca_srv, lock_file, PATH_MAX) < 0) 
-		sod_errx(EX_OSERR, "Can't write %d in %s", getpid(), pid_file);		
+	if (write(fd, lock_file, PATH_MAX) < 0) 
+		sod_errx(EX_OSERR, "Can't write %d in %s", getpid(), pid_file);
+		
+	(void)close(fd);	
 /*
  * Create listening socket.
  */				
@@ -218,28 +220,30 @@ main(int argc, char **argv)
 
 	len += offsetof(struct sockaddr_un, sun_path);
 	
-	if ((sca.sca_srv = socket(sun->sun_family, SOCK_STREAM, 0)) < 0) 
+	if ((fd = socket(sun->sun_family, SOCK_STREAM, 0)) < 0) 
 		sod_errx(EX_OSERR, "Can't create socket");
  
 	(void)unlink(sun->sun_path);
 
-	if (bind(sca.sca_srv, (struct sockaddr *)sun, len) < 0)
+	if (bind(fd, (struct sockaddr *)sun, len) < 0)
 		sod_errx(EX_OSERR, "Can't bind %s", sun->sun_path);	
 
-	if (listen(sca.sca_srv, SOD_QLEN) < 0) 
+	if (listen(fd, SOD_QLEN) < 0) 
 		sod_errx(EX_OSERR, "Can't listen %s", sun->sun_path);
-/*
- * Initialize requested component set.
- */
-	if (libsod_conv_include(&sca) < 0)
-		sod_errx(EX_OSERR, "Can't initialize libsod_conv component set");
+	
+	
 	
 	for (;;) {
+		int rmt;
 /*
  * Wait until accept(2) and perform by 
  * pthread(3) embedded transaction.
  */
-		sod_create_conv(&sca);
+		if ((rmt = accept(fd, NULL, NULL)) < 0)
+			continue;
+		
+		if ((*ap->cm_ctor)(fd, rmt) != NULL)
+			
 	}
 			/* NOT REACHED */	
 }
