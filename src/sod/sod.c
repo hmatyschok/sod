@@ -50,7 +50,7 @@
 static pid_t 	pid;
 static pthread_t 	tid;
 
-static struct auth_provider_arg apa = { 0 };
+static struct c_authenticator *ca;
 
 static char *cmd; 
 

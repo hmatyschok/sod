@@ -230,10 +230,7 @@ c_thr_destroy(void *arg0, void *arg1)
 /*
  * Release object from database.
  */	
-	if (rv = c_thr_del(cls, thr))
-		goto out;
-	
-	free(thr);
+	rv = c_thr_del(cls, thr);
 out:		
 	return (rv);
 }
@@ -287,6 +284,9 @@ c_cache_get(struct c_cache *ch, DBT *key, DBT *data)
 static int 	
 c_cache_del(struct c_cache *ch, DBT *key, DBT *data)
 {
+	if ((*ch->ch_db->get)(ch->ch_db, key, data, 0))
+		return (-1);
+	
 	if ((*ch->ch_db->del)(ch->ch_db, key, 0))
 		return (-1);
 		
@@ -363,11 +363,12 @@ c_thr_del(struct c_class *cls, struct c_thr *thr)
 	key.data = &o->c_cookie;
 	key.size = sizeof(o->c_cookie);
 	
-	o->c_size = cls->c_obj.c_size;
-	data.size = o->c_size;
-	data.data = o;
+	if (c_cache_del(ch, &key, &data))
+		return (-1);
 	
-	return (c_cache_del(ch, &key, &data));
+	free(data.data);
+	
+	return (0);
 }
 
 /******************************************************************************
