@@ -31,20 +31,26 @@
 #include <unistd.h>
 
 
-typedef void *	(*c_start_t)(void *);
-typedef int 	(*c_init_t)(void *);
-typedef int 	(*c_add_t)(void *);
-typedef int 	(*c_del_t)(void *);
+typedef int 	(*c_class_init_t)(void *);
+typedef int 	(*c_class_fini_t)(void *);
+typedef int 	(*c_class_add_t)(void *);
+typedef int 	(*c_class_del_t)(void *);
 
-typedef void *	(*c_create_t)(void *, c_start_t);
-typedef int 	(*c_destroy_t)(void *, void *);
+
+typedef void *	(*c_thr_create_t)(void *);
+typedef void *	(*c_thr_start_t)(void *);
+typedef int 	(*c_thr_stop_t)(void *);
+typedef int 	(*c_thr_destroy_t)(void *, void *);
 
 struct c_methods {
-	c_init_t 		cm_init;
-	c_add_t 		cm_add;
-	c_del_t 		cm_del;
-	c_create_t 		cm_create;
-	c_free_t 		cm_free;
+	c_class_init_t 		cm_class_init;
+	c_class_fini_t 		cm_class_fini;
+	c_class_add_t 		cm_class_add;
+	c_class_del_t 		cm_class_del;
+	
+	
+	c_create_thr_t 		cm_thr_create;
+	c_destroy_thr_t 		cm__thrdestroy;
 };
 
 /*

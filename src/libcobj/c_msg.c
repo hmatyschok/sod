@@ -37,15 +37,15 @@
  * Generating set contains SPI for MPI, sod message buffer.
  */
 
-#include "sod_msg.h"
+#include "c_msg.h"
 
 /*
  * Allocates n message primitives.
  */ 
-struct sod_buf * 
-sod_msg_alloc(size_t n)
+struct c_msg * 
+c_msg_alloc(size_t n)
 {
-	struct sod_buf *sb = NULL;
+	struct c_msg *sb = NULL;
 	
 	if (n <= SOD_QLEN)
 		sb = calloc(n, SOD_BUF_LEN);
@@ -57,9 +57,9 @@ sod_msg_alloc(size_t n)
  * Fills message buffer with attributes, if any.
  */
 void 
-sod_msg_prepare(const char *s, uint32_t code, void *thr, struct sod_buf *sb)
+c_msg_prepare(const char *s, uint32_t code, void *thr, struct c_msg *sb)
 {
-	struct sod_header *sh = NULL;
+	struct c_header *sh = NULL;
 	
 	if (sb != NULL) {
 		(void)memset(sb, 0, sizeof(*sb));
@@ -79,7 +79,7 @@ sod_msg_prepare(const char *s, uint32_t code, void *thr, struct sod_buf *sb)
  * Wrapper for sendmsg(2).
  */
 ssize_t 
-sod_msg_send(int s, struct msghdr *msg, int flags)
+c_msg_send(int s, struct msghdr *msg, int flags)
 {
 	return (sendmsg(s, msg, flags));
 }
@@ -88,7 +88,7 @@ sod_msg_send(int s, struct msghdr *msg, int flags)
  * Wrapper for recvmsg(2).
  */
 ssize_t 
-sod_msg_recv(int s, struct msghdr *msg, int flags)
+c_msg_recv(int s, struct msghdr *msg, int flags)
 {
 	return (recvmsg(s, msg, flags));
 }
@@ -97,7 +97,7 @@ sod_msg_recv(int s, struct msghdr *msg, int flags)
  * Performs MPI exchange via callback.  
  */
 int
-sod_msg_handle(sod_msg_t sod_msg, int s, struct sod_buf *sb)
+c_msg_handle(c_msg_t c_msg, int s, struct c_msg *sb)
 {
 	int eval = -1;
 	ssize_t len;
@@ -107,13 +107,13 @@ sod_msg_handle(sod_msg_t sod_msg, int s, struct sod_buf *sb)
 	if (sb == NULL)
 		goto out;
 
-	if (sod_msg == NULL)
+	if (c_msg == NULL)
 		goto out;
 
 	if ((len = sizeof(*sb)) != SOD_BUF_LEN)
 		goto out;
 
-	if (sod_msg == sod_msg_recv || sod_msg == sod_msg_send) {
+	if (c_msg == c_msg_recv || c_msg == c_msg_send) {
 		vec.iov_base = sb;
 		vec.iov_len = len;
 	
@@ -122,7 +122,7 @@ sod_msg_handle(sod_msg_t sod_msg, int s, struct sod_buf *sb)
 		msg.msg_iov = &vec;
 		msg.msg_iovlen = 1;			
 		
-		if ((*sod_msg)(s, &msg, 0) == len)
+		if ((*c_msg)(s, &msg, 0) == len)
 			eval = 0;	
 	}
 out:
@@ -134,7 +134,7 @@ out:
  * releases bound ressources.
  */
 void 
-sod_free_msg(struct sod_buf *sb)
+c_free_msg(struct c_msg *sb)
 {
 	if (sb != NULL) {
 		(void)memset(sb, 0, sizeof(*sb));

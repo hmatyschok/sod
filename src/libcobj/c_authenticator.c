@@ -44,6 +44,14 @@
 
 #include "c_obj_internal.h"
 
+#define C_AUTHENTICATOR_CLASS 	1421959420
+
+#define	C_AUTHENTICATOR_BACKOFF_DFLT 	3
+#define	C_AUTHENTICATOR_RETRIES_DFLT 	10
+
+#define	C_AUTHENTICATOR_PROMPT_DFLT		"login: "
+#define	C_AUTHENTICATOR_PW_PROMPT_DFLT	"Password:"
+
 #define C_AUTHENTICATOR_AUTH_REQ 	0x00000001
 #define C_AUTHENTICATOR_TERM_REQ 	0x00000002
 
@@ -57,18 +65,7 @@
  * Component, proxyfies pam(8) based authentication service.
  */
 
-#define C_AUTHENTICATOR_COOKIE 	1421959420
-#define C_AUTHENTICATOR_TYPE 	"ap"
-
-struct c_authenticator_softc *sc;
-
-/*
- * Recursively defined callback function. 
- */
-typedef long 	(*ca_state_fn_t)(struct c_authenticator_softc *, *);
-typedef ca_state_fn_t 	(*ca_state_t)(struct c_authenticator_softc *, *);
-
-struct c_authenticator_softc {
+struct ca_softc {
 	struct c_thr 	sc_thr; 	/* binding, pthread(3) */
 	
 	pam_handle_t 	*sc_pamh;	
@@ -88,39 +85,32 @@ struct c_authenticator_softc {
 	
 	uint32_t 	sc_rv; 	/* tracks rv of pam(3) method calls */		
 };
-#define C_AUTHENTICATOR_SIZE (sizeof(struct c_authenticator_softc *sc,))
+#define C_AUTHENTICATOR_SIZE (sizeof(struct ca_softc *sc,))
 
-#define	C_AUTHENTICATOR_DFLT_BACKOFF 	3
-#define	C_AUTHENTICATOR_DFLT_RETRIES 	10
+/*
+ * Recursively defined callback function. 
+ */
+typedef long 	(*ca_state_fn_t)(struct ca_softc *, *);
+typedef ca_state_fn_t 	(*ca_state_t)(struct ca_softc *, *);
 
-#define	C_AUTHENTICATOR_DFLT_PROMPT		"login: "
-#define	C_AUTHENTICATOR_DFLT_PW_PROMPT	"Password:"
-
-/******************************************************************************
- * Prototypes, private methods                                                *
- ******************************************************************************/
-
-static void 	ap_init(void);
-static int 	ap_authenticate(int, const struct pam_message **, 
+static int 	ca_conv(int, const struct pam_message **, 
 	struct pam_response **, void *);
-
-/******************************************************************************
- * Prototypes, pthread(3) life-cycle for transaction component                *
- ******************************************************************************/
+static ca_state_fn_t 	ca_response(struct ca_softc *sc, *);
+static ca_state_fn_t 	ca_authenticate(struct ca_softc *sc, *);
+static ca_state_fn_t 	ca_establish(struct ca_softc *sc, *);
+static void * 	ap_start(void *); 
  
-static ca_state_fn_t 	ap_response(struct c_authenticator_softc *sc, *);
-static ca_state_fn_t 	ap_authenticate(struct c_authenticator_softc *sc, *);
-static ca_state_fn_t 	ap_establish(struct c_authenticator_softc *sc, *);
-static void * 	ap_start(void *);
+static struct c_thr * 	c_authenticator_create(int srv, int rmt);
+static void 	c_authenticator_destroy(struct c_thr *thr); 
 
-/******************************************************************************
- * Statically defined attributes                                              *
- ******************************************************************************/
-static const char 	*ca_default_prompt = C_AUTHENTICATOR_DFLT_PROMPT;
-static const char 	*ca_default_pw_prompt = C_AUTHENTICATOR_DFLT_PW_PROMPT;
+/*
+ * Class-attributes.
+ */
+ 
+static const char 	*ca_default_prompt = C_AUTHENTICATOR_PROMPT_DFLT;
+static const char 	*ca_default_pw_prompt = C_AUTHENTICATOR_PW_PROMPT_DFLT;
 
-
-static struct c_authenticator c_authenticator = {
+static struct c_authenticator c_authenticator_methods = {
 	.ca_create 		= c_authenticator_create,
 	.ca_destroy 	= c_authenticator_destroy,
 };
@@ -130,7 +120,7 @@ static struct c_class c_authenticator_class = {
 		.c_cookie 		= C_AUTHENTICATOR_CLASS,
 		.c_size 		= C_AUTHENTICATOR_SIZE,
 	},
-	.c_public 		= &c_authenticator,
+	.c_public 		= &c_authenticator_methods,
 };
 
 /*
@@ -140,8 +130,10 @@ static struct c_class c_authenticator_class = {
 struct c_authenticator * 
 c_authenticator_class_init(void)
 {
-	struct *c_class *this = &c_authenticator_class;
+	struct *c_class *this;
 	struct c_methods *cm;
+
+	this = &c_authenticator_class;
 
 	if ((cm = c_base_class_init()) == NULL)
 		return (NULL);
@@ -155,11 +147,17 @@ c_authenticator_class_init(void)
 	return (this->c_public);	
 }
 
+/*
+ * Unregisters class at parent class, iff there are no running instances. 
+ */
+
 int  
 c_authenticator_class_free(void)
 {
-	struct *c_class *this = &c_authenticator_class;
+	struct *c_class *this;
 	struct c_methods *cm;
+
+	this = &c_authenticator_class;
 
 	if ((cm = this->c_base) == NULL);
 		return (-1);
@@ -170,18 +168,20 @@ c_authenticator_class_free(void)
 	return ((*cm->cm_free)(this));	
 }
 
-/******************************************************************************
- * Constructor.                                                               *
- ******************************************************************************/
-
+/*
+ * Ctor.
+ */
 static struct c_thr *
 c_authenticator_create(int srv, int rmt) 
 {
-	struct c_class *this = &c_authenticator_class;
-	struct c_methods *cm = this->c_base;
-	struct c_authenticator_softc *sc;
+	struct c_class *this;
+	struct c_methods *cm;
+	struct ca_softc *sc;
 	struct pam_conv *pamc;
 	struct c_thr *thr;
+	
+	this = &c_authenticator_class;
+	cm = this->c_base;
 	
 	if ((sc = (*base->cm_ctor)(this, c_authenticator_start)) != NULL) {
 		sc->sc_sock_rmt = rmt;
@@ -189,7 +189,7 @@ c_authenticator_create(int srv, int rmt)
 	
 		pamc = &sc->sc_pamc;
 		pamc->appdata_ptr = sc;
-		pamc->conv = ap_authenticate;
+		pamc->conv = ap_conv;
 		
 		thr = &sc->sc_thr;
 		
@@ -199,6 +199,9 @@ c_authenticator_create(int srv, int rmt)
 	return (thr);
 }
 
+/*
+ * Dtor.
+ */
 static void
 c_authenticator_destroy(struct c_thr *thr) 
 {
@@ -212,7 +215,7 @@ c_authenticator_destroy(struct c_thr *thr)
 	
 		pamc = &sc->sc_pamc;
 		pamc->appdata_ptr = sc;
-		pamc->conv = ap_authenticate;
+		pamc->conv = ca_conv;
 		
 		thr = &sc->sc_thr;	
 	} else
@@ -220,25 +223,16 @@ c_authenticator_destroy(struct c_thr *thr)
 	return (thr);
 }
 
-
-
-
-
-
-/******************************************************************************
- * Definitions, private methods                                               *
- ******************************************************************************/
- 
 /*
  * By pam_vpromt(3) called conversation routine.
  * This event takes place during runtime of by
  * pam_authenticate(3) called pam_get_authtok(3).
  */
 static int 
-c_authenticator_authenticate(int num_msg, const struct pam_message **msg, 
+ca_conv(int num_msg, const struct pam_message **msg, 
 		struct pam_response **resp, void *data) 
 {
-	struct c_authenticator_softc *sc *sc = NULL;
+	struct ca_softc *sc *sc = NULL;
 	int pam_err = PAM_AUTH_ERR;
 	int p = 1, q, i, style, j;
 	struct pam_response *tok;
@@ -359,7 +353,7 @@ c_authenticator_start(void *arg)
  * Inital state, rx request and state transition.
  */
 static ca_state_fn_t 
-c_authenticator_establish(struct c_authenticator_softc *sc, *sc)
+c_authenticator_establish(struct ca_softc *sc, *sc)
 {
 	ca_state_fn_t ca_state = NULL;
 
@@ -403,7 +397,7 @@ out:
  * Initialize pam(8) transaction and authenticate.
  */
 static ca_state_fn_t  
-c_authenticator_authenticate(struct c_authenticator_softc *sc, *sc)
+c_authenticator_authenticate(struct ca_softc *sc, *sc)
 {	
 	ca_state_fn_t ca_state = NULL;
 	login_cap_t *lc = NULL;
@@ -427,9 +421,9 @@ syslog(LOG_ERR, "%s\n", __func__);
 	ap->sc_pw_prompt = login_getcapstr(lc, "passwd_prompt", 
 		ap_default_pw_prompt, ap_default_pw_prompt);
 	retries = login_getcapnum(lc, "login-retries", 
-		C_AUTHENTICATOR_DFLT_RETRIES, C_AUTHENTICATOR_DFLT_RETRIES);
+		C_AUTHENTICATOR_RETRIES_DFLT, C_AUTHENTICATOR_RETRIES_DFLT);
 	backoff = login_getcapnum(lc, "login-backoff", 
-		C_AUTHENTICATOR_DFLT_BACKOFF, C_AUTHENTICATOR_DFLT_BACKOFF);
+		C_AUTHENTICATOR_BACKOFF_DFLT, C_AUTHENTICATOR_BACKOFF_DFLT);
 	login_close(lc);
 	lc = NULL;
 /*
@@ -513,7 +507,7 @@ out:
  * Send response.
  */
 static ca_state_fn_t  
-c_authenticator_response(struct c_authenticator_softc *sc, *sc)
+c_authenticator_response(struct ca_softc *sc, *sc)
 {	
 	ca_state_fn_t ca_state = NULL;
 	
@@ -536,7 +530,7 @@ out:
 static void  
 c_authenticator_stop(void *arg)
 {
-	struct c_authenticator_softc *sc, *sc = NULL;
+	struct ca_softc *sc, *sc = NULL;
 
 	if ((sc = arg) == NULL) 
 		return;

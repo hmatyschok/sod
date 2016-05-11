@@ -42,37 +42,37 @@
  * Message primitive (MPI) encapsulates message token.
  */
  
-struct tobj_mbuf {
-	struct tobj_descr 	sb_h; 
+struct c_msg {
+	struct c_obj 	sb_h; 
 	uint32_t 	sb_code; 	/* encodes request or response */
 	char 	sb_tok[SOD_NMAX + 1];
 };
-#define SOD_MBUF_LEN 	(sizeof(struct tobj_mbuf))
+#define C_MSG_LEN 	(sizeof(struct c_msg))
 
 /*
  * Service Primitives (SPI).
  */
 
-#define TOBJ_MSG_ACK 	0x00000010
-#define TOBJ_MSG_NAK 	0x00000020
-#define TOBJ_MSG_REJ 	0x00000030
+#define C_MSG_ACK 	0x00000010
+#define C_MSG_NAK 	0x00000020
+#define C_MSG_REJ 	0x00000030
 
-typedef ssize_t 	(*tobj_msg_t)(int, struct msghdr *, int);
+typedef ssize_t 	(*c_msg_t)(int, struct msghdr *, int);
 
-typedef struct tobj_mbuf * 	(*tobj_msg_alloc_t)(size_t);
-typedef void 	(*tobj_msg_prepare_t)(char *, uint32_t, void *, 
-	struct tobj_mbuf *);
-typedef ssize_t 	(*tobj_msg_send_t)(int, struct msghdr *, int);
-typedef ssize_t 	(*tobj_msg_recv_t)(int, struct msghdr *, int);
-typedef int 	(*tobj_msg_handle_t)(tobj_msg_t, int, struct tobj_mbuf *);
-typedef void 	(*tobj_msg_free_t)(struct tobj_mbuf *);
+typedef struct c_msg * 	(*c_msg_alloc_t)(size_t);
+typedef void 	(*c_msg_prepare_t)(char *, uint32_t, void *, 
+	struct c_msg *);
+typedef ssize_t 	(*c_msg_send_t)(int, struct msghdr *, int);
+typedef ssize_t 	(*c_msg_recv_t)(int, struct msghdr *, int);
+typedef int 	(*c_msg_handle_t)(c_msg_t, int, struct c_msg *);
+typedef void 	(*c_msg_free_t)(struct c_msg *);
 
 _BEGIN_DECLS
-extern struct tobj_mbuf * 	tobj_msg_alloc(size_t);
-extern void 	tobj_msg_prepare(const char *, uint32_t, void *, 
-	struct tobj_mbuf *);
-extern ssize_t 	tobj_msg_send(int, struct msghdr *, int);
-extern ssize_t 	tobj_msg_recv(int, struct msghdr *, int);
-extern int 	tobj_msg_handle(tobj_msg_t, int, struct tobj_mbuf *);
-extern void 	tobj_msg_free(struct tobj_mbuf *);
+extern struct c_msg * 	c_msg_alloc(size_t);
+extern void 	c_msg_prepare(const char *, uint32_t, void *, 
+	struct c_msg *);
+extern ssize_t 	c_msg_send(int, struct msghdr *, int);
+extern ssize_t 	c_msg_recv(int, struct msghdr *, int);
+extern int 	c_msg_handle(c_msg_t, int, struct c_msg *);
+extern void 	c_msg_free(struct c_msg *);
 __END_DECLS

@@ -32,8 +32,9 @@ struct c_class {
 	struct c_cache 	c_children;
 	struct c_cache 	c_instances;
 	
-	void 	*c_base;
-	void 	*c_methods;
+	void 	*c_base_methods;
+	void 	*c_priv_methods;
+	void 	*c_pub_methods;
 };
 
 
