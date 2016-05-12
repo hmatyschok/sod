@@ -103,7 +103,7 @@ sod_sigaction(void *arg)
 
 	if (pthread_sigmask(SIG_BLOCK, &sisgset, NULL) != 0)
 		sod_errx(EX_OSERR, "Can't apply modefied signal set");
-		
+			
 	for (;;) {
 		if (sigwait(&sigset, &sig) != 0)
 			sod_errx(EX_OSERR, "Can't select signal set");
@@ -230,10 +230,14 @@ main(int argc, char **argv)
 
 	if (listen(fd, SOD_QLEN) < 0) 
 		sod_errx(EX_OSERR, "Can't listen %s", sun->sun_path);
-	
-	
-	
+/*
+ * Fetch interface from c_authenticator_class.
+ */	
+ 	if ((ca = c_authenticator_class_init()) == NULL)
+ 		sod_errx(EX_OSERR, "Can't initialize c_authenticator");
+ 
 	for (;;) {
+		struct c_thr *thr;
 		int rmt;
 /*
  * Wait until accept(2) and perform by 
@@ -242,8 +246,10 @@ main(int argc, char **argv)
 		if ((rmt = accept(fd, NULL, NULL)) < 0)
 			continue;
 		
-		if ((*ap->cm_ctor)(fd, rmt) != NULL)
-			
+		if ((thr = (*ca->ca_create)(fd, rmt)) != NULL) {
+			(void)pthread_join(thr->c_tid);
+			(void)(*ca->ca_destroy)(thr);	
+		}
 	}
 			/* NOT REACHED */	
 }
