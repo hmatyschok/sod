@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 Henning Matyschok
+ * Copyright (c) 2015, 2016 Henning Matyschok
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,12 +25,17 @@
  * version=0.1 
  */
 
-struct c_auth_provider {
-	c_ap_ctor_t 	ap_ctor;
-	c_ap_dtor_t 	ap_dtor;
+#include <c_obj.h>
+
+typedef struct c_thr * 	(*ca_create_t)(int, int);
+typedef int 	(*ca_destroy_t)(struct c_thr *);
+
+struct c_authenticator {
+	ca_create_t 	ca_create;
+	ca_destroy_t 	ca_destroy;
 };
 
-
 __BEGIN_DECLS
-
+struct c_authenticator * 	c_authenticator_class_init(void);
+int 	c_authenticator_class_free(void);
 __END_DECLS

@@ -44,8 +44,7 @@
  * Simple sign-on service on demand daemon - sod
  */
 
-#include <sod_msg.h>
-#include <auth_provider.h>
+#include <c_authenticator.h>
 
 static pid_t 	pid;
 static pthread_t 	tid;
@@ -81,7 +80,8 @@ sod_errx(int eval, const char *fmt, ...)
 static void 
 sod_atexit(void)
 {
-	libsod_conv_exclude();
+	if (ca != NULL) 
+		(void)c_authenticator_class_free();
 	
 	(void)unlink(sock_file);
 	(void)unlink(pid_file);

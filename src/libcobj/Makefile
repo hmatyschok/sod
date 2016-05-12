@@ -1,4 +1,4 @@
-# Copyright 2015 Henning Matyschok.
+# Copyright 2015, 2016 Henning Matyschok.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -33,13 +33,13 @@ LDADD=	-lpam -lpthread -lutil
 SHLIB_MAJOR=1
 SHLIB_MINOR=0
 
-SRCS=	sod_msg.c \
-		sod_thr.c \
-		sod_conv.c 
+SRCS=	c_obj.c \
+		c_authenticator.c \
+		...
 
-INCS=	sod_msg.h \
-		sod_thr.h \
-		sod_conv.h
+INCS=	c_obj.h \
+		c_authenticator.h \
+		...
 
 WARNS?=	3
 

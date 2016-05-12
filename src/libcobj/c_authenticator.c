@@ -40,8 +40,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include 
-
+#include <c_authenticator.h>
 #include "c_obj_internal.h"
 
 #define C_AUTHENTICATOR_CLASS 	1421959420
