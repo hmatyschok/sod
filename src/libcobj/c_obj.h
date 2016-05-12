@@ -31,26 +31,27 @@
 #include <unistd.h>
 
 
-typedef int 	(*c_class_init_t)(void *);
-typedef int 	(*c_class_fini_t)(void *);
+typedef void * 	(*c_class_init_t)(void *);
+typedef int 	(*c_class_free_t)(void *);
 typedef int 	(*c_class_add_t)(void *);
 typedef int 	(*c_class_del_t)(void *);
 
 
-typedef void *	(*c_thr_create_t)(void *);
-typedef void *	(*c_thr_start_t)(void *);
-typedef int 	(*c_thr_stop_t)(void *);
-typedef int 	(*c_thr_destroy_t)(void *, void *);
+typedef void *	(*c_obj_create_t)(void *);
+typedef void *	(*c_obj_start_t)(void *);
+typedef int 	(*c_obj_stop_t)(void *);
+typedef int 	(*c_obj_destroy_t)(void *, void *);
 
 struct c_methods {
 	c_class_init_t 		cm_class_init;
-	c_class_fini_t 		cm_class_fini;
 	c_class_add_t 		cm_class_add;
 	c_class_del_t 		cm_class_del;
+	c_class_free_t 		cm_class_free;
 	
-	
-	c_create_thr_t 		cm_thr_create;
-	c_destroy_thr_t 		cm__thrdestroy;
+	c_obj_create_t 		cm_obj_create;
+	c_obj_start_t 		cm_obj_start;
+	c_obj_stop_t 		cm_obj_stop;
+	c_obj_free_t 		cm_obj_free;
 };
 
 /*
@@ -81,7 +82,7 @@ struct c_thr {
 };
 
 __BEGIN_DECLS
-struct c_methods * 	c_base_class_init(void);
+void * 	c_base_class_init(void);
 int 	c_base_class_free(void);
 __END_DECLS
 

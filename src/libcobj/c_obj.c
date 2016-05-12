@@ -60,29 +60,35 @@ static int 	c_class_cache_opt(struct c_cache *, c_cache_cb_t,
 static int 	c_thr_add(struct c_class *, struct c_thr *);
 static int 	c_thr_del(struct c_class *, struct c_thr *);
 
-static struct c_methods *	c_class_init(struct c_class *);
-static int 	c_class_free(struct c_class *);
-static int 	c_class_add(struct c_class *);
-static int 	c_class_del(struct c_class *);
+static void *	c_class_init(void *);
+static int 	c_class_free(void *);
+static int 	c_class_add(void *);
+static int 	c_class_del(void *);
+static void * 	c_thr_create(void *);
+static void * 	c_thr_destroy(void *);
 
-static struct c_methods *	c_nop_init(struct c_class *);
-static int 	c_nop_free(struct c_class *);
-static int 	c_nop_add(struct c_class *);
-static int 	c_nop_del(struct c_class *);
+static void * 	c_nop_init(void *);
+static int 	c_nop_free(void *);
+static int 	c_nop_add(void *);
+static int 	c_nop_del(void *);
+static void * 	c_nop_create(void *);
+static void * 	c_nop_start(void *);
+static int 	c_nop_stop(void *);
+static int 	c_nop_destroy(void *);
 
+/*
+ * Generic class-attributes.
+ */
 
 static struct c_methods c_nop = {
 	.cm_class_init 		= c_nop_init,
 	.cm_class_add 		= c_nop_add,
 	.cm_class_del 		= c_nop_del,
 	.cm_class_free 		= c_nop_free,
-}; 
-
-static struct c_methods c_base = {
-	.cm_class_init 		= c_class_init,
-	.cm_class_add 		= c_class_add,
-	.cm_class_del 		= c_class_del,
-	.cm_class_free 		= c_class_free,
+	.cm_obj_create 		= c_nop_create,
+	.cm_obj_start 		= c_nop_start,
+	.cm_obj_stop 		= c_nop_stop,
+	.cm_obj_free 		= c_nop_destroy,
 }; 
 
 static struct c_class c_base_class = {
@@ -90,8 +96,17 @@ static struct c_class c_base_class = {
 		.c_cookie 		= C_BASE_CLASS,
 		.c_size 		= C_BASE_CLASS_SIZE,
 	},
-	.c_public 		= &c_base,
-	.c_base 		= &c_nop,
+	.c_base = {
+	.cm_class_init 		= c_class_init,
+	.cm_class_add 		= c_class_add,
+	.cm_class_del 		= c_class_del,
+	.cm_class_free 		= c_class_free,
+	.cm_obj_create 		= c_thr_create,
+	.cm_obj_start 		= c_nop_start,
+	.cm_obj_stop 		= c_nop_stop,
+	.cm_obj_free 		= c_thr_destroy,
+	},
+	.c_methods 		= &c_nop,
 };
 
 /*
@@ -103,11 +118,17 @@ static struct c_class c_base_class = {
  * can be unequely extended to a morphism h between A 
  * and B of Sigma-algebras, where f < h.  
  */
-struct c_methods * 
+void * 
 c_base_class_init(void)
 {
-
 	return (c_class_init(&c_base_class));	
+}
+
+int 
+c_base_class_free(void)
+{
+
+	return (c_class_free(&c_base_class));	
 }
 
 /*
@@ -125,19 +146,14 @@ c_base_class_init(void)
  */
 
 static void *
-c_thr_create(void *arg, c_start_t c_start)
+c_thr_create(void *arg)
 {
-	struct c_class *cls;
 	struct c_thr *thr = NULL;
+	struct c_class *cls;	
 /*
  * Apply various condition tests.
  */	
 	if ((cls = arg) == NULL)
-		goto out;
-/*
- * Verify, if called component set exists.
- */	
-	if (cls->c_base == NULL)
 		goto out;
 /*
  * An abstract component cannot instantiate itself.
@@ -160,7 +176,7 @@ c_thr_create(void *arg, c_start_t c_start)
 /*
  * If successfull, then create running pthread(3) instance.
  */	
-	if (pthread_create(&thr->c_tid, NULL, c_start, thr) != 0) 
+	if (pthread_create(&thr->c_tid, NULL, cls->c_base->c_start, thr) != 0) 
 		goto bad2;
 
 	if (c_thr_add(cls, thr))
@@ -223,11 +239,151 @@ out:
 	return (rv);
 }
 
-int 
-c_base_class_free(void)
+/*
+ * Generic class-methods.
+ */
+
+static void *
+c_class_init(void *arg)
+{
+	struct c_class *cls;
+	
+	if ((cls = arg) == NULL) 
+		return (NULL);
+		
+	if (c_cache_init(cls->c_children))
+		return (NULL);
+
+	if (c_cache_init(cls->c_instances)) {
+		c_cache_free(cls->c_children);
+		return (NULL);
+	}
+	cls->c_base = cls->c_methods;
+	
+	return (&cls->c_methods);	
+}
+
+static int
+c_class_add(void *arg)
+{
+	struct c_class *cls;
+	struct c_class *bc;
+	
+	if ((cls = arg) == NULL) 
+		return (-1);
+	
+	bc = &c_base_class;
+	
+	if (cls == bc)
+		return (-1);
+	
+	if (c_cache_op(bc->c_children, c_cache_add, cls))
+		return (-1);
+		
+	return (0);
+}
+
+static int
+c_class_del(void *arg)
+{
+	struct c_class *cls;
+	struct c_class *bc;
+	
+	if ((cls = arg) == NULL) 
+		return (-1);
+	
+	bc = &c_base_class;
+	
+	if (cls == bc)
+		return (-1);
+		
+	if (c_class_op(bc->c_children, c_cache_del, cls))
+		return (-1);
+		
+	return (0);
+}
+
+static int 
+c_class_free(void *arg)
+{
+	struct c_class *cls;
+	
+	if ((cls = arg) == NULL) 
+		return (-1);
+	
+	if (c_cache_free(cls->c_children))
+		return (-1);
+		
+	if (c_cache_free(cls->c_instances))
+		return (-1);
+
+	cls->c_base = c_nop;
+
+	return (0);	
+}
+
+/*
+ * Non-operations, class scope.
+ */
+
+static void *
+c_nop_init(void *arg)
 {
 
-	return (c_class_free(&c_base_class));	
+	return (NULL);	
+}
+
+static int 
+c_nop_free(void *arg)
+{
+
+	return (-1);	
+}
+
+static int
+c_nop_add(void *arg)
+{
+		
+	return (-1);
+}
+
+static int
+c_nop_del(void *arg)
+{
+		
+	return (-1);
+}
+
+/*
+ * Null-operations, object scope.
+ */
+
+static void *
+c_nop_create(void *arg)
+{
+
+	return (NULL);
+}
+
+static void * 	
+c_nop_start(void *arg)
+{
+
+	return (arg);
+}
+
+static int 	
+c_nop_stop(void *arg)
+{
+
+	return (arg);
+}
+
+static int 	
+c_nop_destroy(void *arg)
+{
+
+	return (arg);
 }
 
 /*
@@ -359,130 +515,3 @@ c_thr_del(struct c_class *cls, struct c_thr *thr)
 	return (0);
 }
 
-/*
- * Generic class-methods.
- */
-
-static struct c_methods *
-c_class_init(void *arg)
-{
-	struct c_class *cls;
-	
-	if ((cls = arg) == NULL) 
-		return (NULL);
-		
-	if (c_cache_init(cls->c_children))
-		return (NULL);
-
-	if (c_cache_init(cls->c_instances)) {
-		c_cache_free(cls->c_children);
-		return (NULL);
-	}
-	return (cls->c_methods);	
-}
-
-static int
-c_class_add(void *arg)
-{
-	struct c_class *cls;
-	struct c_class *bc;
-	
-	if ((cls = arg) == NULL) 
-		return (-1);
-	
-	bc = &c_base_class;
-	
-	if (cls == bc)
-		return (-1);
-	
-	if (c_cache_op(bc->c_children, c_cache_add, cls))
-		return (-1);
-		
-	cls->c_base = bc->c_methods;
-
-	return (0);
-}
-
-static int
-c_class_del(void *arg)
-{
-	struct c_class *cls;
-	struct c_class *bc;
-	
-	if ((cls = arg) == NULL) 
-		return (-1);
-	
-	bc = &c_base_class;
-	
-	if (cls == bc)
-		return (-1);
-		
-	if (c_class_op(bc->c_children, c_cache_del, cls))
-		return (-1);
-		
-	cls->c_base = NULL;
-		
-	return (0);
-}
-
-static int 
-c_class_free(void *arg)
-{
-	struct c_class *cls;
-	
-	if ((cls = arg) == NULL) 
-		return (-1);
-	
-	if (c_cache_free(cls->c_children))
-		return (-1);
-		
-	if (c_cache_free(cls->c_instances))
-		return (-1);
-
-	return (0);	
-}
-
-/*
- * Non-operations, placeholder.
- */
-
-static struct c_methods *
-c_nop_init(struct c_class *cls)
-{
-
-	return (NULL);	
-}
-
-static int 
-c_nop_free(struct c_class *cls)
-{
-
-	return (-1);	
-}
-
-static int
-c_nop_add(struct c_class *cls)
-{
-		
-	return (-1);
-}
-
-static int
-c_nop_del(struct c_class *cls)
-{
-		
-	return (-1);
-}
-
-static void *
-c_nop_create(struct c_class *cls)
-{
-
-	return (NULL);
-}
-static void * 	
-c_nop_start(void *arg)
-{
-
-	return (arg);
-}

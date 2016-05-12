@@ -120,7 +120,7 @@ static struct c_class c_authenticator_class = {
 		.c_cookie 		= C_AUTHENTICATOR_CLASS,
 		.c_size 		= C_AUTHENTICATOR_SIZE,
 	},
-	.c_public 		= &c_authenticator_methods,
+	.c_methods 		= &c_authenticator_methods,
 };
 
 /*
@@ -134,16 +134,20 @@ c_authenticator_class_init(void)
 	struct c_methods *cm;
 
 	this = &c_authenticator_class;
+	cm = &this->c_base;
 
 	if ((cm = c_base_class_init()) == NULL)
 		return (NULL);
 	
-	if ((*cm->cm_init)(this) == NULL)
+	if ((cm = (*cm->cm_class_init)(this)) == NULL)
 		return (NULL);
 
-	if ((*cm->cm_add)(this))
+	if ((*cm->cm_class_add)(this)) {
+		(void)(*cm->cm_class_free)(this);
 		return (NULL);
-		
+	}
+	cm->cm_obj_start = ca_start;
+	
 	return (this->c_public);	
 }
 
@@ -158,14 +162,12 @@ c_authenticator_class_free(void)
 	struct c_methods *cm;
 
 	this = &c_authenticator_class;
+	cm = &this->c_base;
 
-	if ((cm = this->c_base) == NULL);
+	if ((cm->cm_class_del(this)))
 		return (-1);
-	
-	if ((*cm->cm_del)(this))
-		return (-1);
-	
-	return ((*cm->cm_free)(this));	
+		
+	return ((*cm->cm_class_free)(this));	
 }
 
 /*
@@ -181,9 +183,9 @@ c_authenticator_create(int srv, int rmt)
 	struct c_thr *thr;
 	
 	this = &c_authenticator_class;
-	cm = this->c_base;
+	cm = &this->c_base;
 	
-	if ((sc = (*base->cm_ctor)(this, c_authenticator_start)) != NULL) {
+	if ((sc = (*cm->cm_ctor)(this)) != NULL) {
 		sc->sc_sock_rmt = rmt;
 		sc->sc_sock_cli = cli;
 	
@@ -202,25 +204,15 @@ c_authenticator_create(int srv, int rmt)
 /*
  * Dtor.
  */
-static void
+static int 
 c_authenticator_destroy(struct c_thr *thr) 
 {
 	struct c_class *this = &c_authenticator_class;
-	struct c_methods *base = this->c_base;
+	struct c_methods *base = &this->c_base;
 	
+	....
 	
-	if ((sc = (*base->cm_free)(this, thr)) != NULL) {
-		sc->sc_sock_rmt = rmt;
-		sc->sc_sock_cli = cli;
-	
-		pamc = &sc->sc_pamc;
-		pamc->appdata_ptr = sc;
-		pamc->conv = ca_conv;
-		
-		thr = &sc->sc_thr;	
-	} else
-		thr = NULL;
-	return (thr);
+	return (0);
 }
 
 /*

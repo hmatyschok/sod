@@ -28,13 +28,11 @@
 #include "c_obj_internal.h"
 
 struct c_class {
-	struct c_obj 	c_obj;
-	struct c_cache 	c_children;
-	struct c_cache 	c_instances;
-	
-	void 	*c_base_methods;
-	void 	*c_priv_methods;
-	void 	*c_pub_methods;
+	struct c_obj 		c_obj;
+	struct c_cache 		c_children;
+	struct c_cache 		c_instances;
+	struct c_methods 		c_base;
+	void 	*c_methods;
 };
 
 
