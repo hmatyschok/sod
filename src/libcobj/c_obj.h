@@ -36,7 +36,6 @@ typedef int 	(*c_class_free_t)(void *);
 typedef int 	(*c_class_add_t)(void *);
 typedef int 	(*c_class_del_t)(void *);
 
-
 typedef void *	(*c_obj_create_t)(void *);
 typedef void *	(*c_obj_start_t)(void *);
 typedef int 	(*c_obj_stop_t)(void *);
@@ -79,6 +78,14 @@ struct c_thr {
 	pthread_cond_t 	c_cv;
 	pthread_mutex_t 	c_mtx;
 	pthread_t 	c_tid;
+};
+
+struct c_class {
+	struct c_obj 		c_obj;
+	struct c_cache 		c_children;
+	struct c_cache 		c_instances;
+	struct c_methods 		c_base;
+	void 	*c_methods;
 };
 
 __BEGIN_DECLS

@@ -40,11 +40,11 @@
 #include <sysexits.h>
 #include <syslog.h>
 
+#include <c_obj.h>
+
 /*
  * Set contains abstract components.
  */
-
-#include "cobj.h"
 
 typedef int  	(*c_cache_cb_t)(struct c_cache *, DBT *, DBT *);
 
