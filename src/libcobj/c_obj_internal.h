@@ -25,7 +25,7 @@
  * version=0.1 
  */
 
-#include "c_obj_internal.h"
+#include <c_obj.h>
 
 struct c_class {
 	struct c_obj 		c_obj;
