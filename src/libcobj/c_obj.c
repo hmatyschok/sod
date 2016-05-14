@@ -54,11 +54,8 @@ static int 	c_cache_get(struct c_cache *, DBT *, DBT *);
 static int 	c_cache_del(struct c_cache *, DBT *, DBT *);
 static int 	c_cache_free(struct c_cache *);
 
-static int 	c_class_cache_opt(struct c_cache *, c_cache_cb_t, 
+static int 	c_class_cache_opt(c_cache_cb_t, struct c_cache *, 
 	struct c_class *);
-
-static int 	c_thr_add(struct c_class *, struct c_thr *);
-static int 	c_thr_del(struct c_class *, struct c_thr *);
 
 static void *	c_class_init(void *);
 static int 	c_class_free(void *);
@@ -153,7 +150,10 @@ static void *
 c_thr_create(void *arg)
 {
 	struct c_thr *thr = NULL;
-	struct c_class *cls;	
+	struct c_class *cls;
+	
+	DBT key;
+	DBT data;	
 /*
  * Apply various condition tests.
  */	
@@ -183,7 +183,16 @@ c_thr_create(void *arg)
 	if (pthread_create(&thr->c_tid, NULL, cls->c_base->c_start, thr) != 0) 
 		goto bad2;
 
-	if (c_thr_add(cls, thr))
+	bcopy(thr->c_tid, &thr->c_obj.c_cookie, sizeof(thr->c_obj.c_cookie));
+	
+	key.data = &thr->c_obj.c_cookie;
+	key.size = sizeof(thr->c_obj.c_cookie);
+	
+	thr->c_obj.c_size = cls->c_obj.c_size;
+	data.size = thr->c_obj.c_size;
+	data.data = thr;
+	
+	if (c_cache_add(&cls->c_children, &key, &data))
 		goto bad3;
 out:		
 	return (thr);
@@ -210,6 +219,9 @@ c_thr_destroy(void *arg0, void *arg1)
 	
 	struct c_class *cls;
 	struct c_thr *thr;
+	
+	DBT key;
+	DBT data;
 
 	if ((thr = arg1) == NULL)	
 		goto out;
@@ -224,12 +236,12 @@ c_thr_destroy(void *arg0, void *arg1)
 	if (cls->c_base == NULL)
 		goto out;
 /*
- * An abstract component cannot instantiate itself.
+ * An abstract component cannot be destroyed.
  */
 	if (cls->c_cookie == c_base_class.c_cookie)
 		goto out;
 /*
- * On success, release pthread(3), can't fail because
+ * Release pthread(3). This operation can't fail because
  * returned ESRCH means that there was no pthread(3). 
  */	
 	(void)pthread_cancel(thr->c_tid);
@@ -238,7 +250,15 @@ c_thr_destroy(void *arg0, void *arg1)
 /*
  * Release object from database.
  */	
-	rv = c_thr_del(cls, thr);
+	key.data = &thr->c_obj.c_cookie;
+	key.size = sizeof(thr->c_obj.c_cookie);
+	
+	(void)memset(&data, 0, sizeof(data));
+	
+	if (c_cache_del(ch, &key, &data))
+		goto out;
+	
+	free(data.data);
 out:		
 	return (rv);
 }
@@ -390,8 +410,13 @@ c_nop_destroy(void *arg)
 	return (arg);
 }
 
-/*
+/******************************************************************************
  * Subr.
+ ******************************************************************************/
+
+/*
+ * Create in-memory hash table based on db(3) 
+ * and initialize corrosponding tail queue.
  */
 
 static int
@@ -411,6 +436,10 @@ c_cache_init(struct c_cache *ch)
 	return (0);
 }
 
+
+/*
+ * Insert item.
+ */
 static int 	
 c_cache_add(struct c_cache *ch, DBT *key, DBT *data)
 {	
@@ -422,6 +451,9 @@ c_cache_add(struct c_cache *ch, DBT *key, DBT *data)
 	return (0);
 }
 
+/*
+ * Find requested item.
+ */
 static int 	
 c_cache_get(struct c_cache *ch, DBT *key, DBT *data)
 {	
@@ -429,6 +461,9 @@ c_cache_get(struct c_cache *ch, DBT *key, DBT *data)
 	return ((*ch->ch_db->get)(ch->ch_db, key, data, 0));
 }
 
+/*
+ * Fetch requested item.
+ */
 static int 	
 c_cache_del(struct c_cache *ch, DBT *key, DBT *data)
 {
@@ -443,6 +478,11 @@ c_cache_del(struct c_cache *ch, DBT *key, DBT *data)
 	return (0);
 }
 
+/*
+ * Release by hash table bound ressources,
+ * if and only if all by table stored items
+ * were released previously.
+ */
 static int
 c_cache_free(struct c_cache *ch)
 {
@@ -464,7 +504,7 @@ c_cache_free(struct c_cache *ch)
 }
 
 static int
-c_class_cache_opt(struct c_cache *ch, c_cache_cb_t cb, struct c_class *cls)
+c_class_cache_opt(c_cache_cb_t cb, struct c_cache *ch, struct c_class *cls)
 {
 	DBT key;
 	DBT data;
@@ -477,45 +517,3 @@ c_class_cache_opt(struct c_cache *ch, c_cache_cb_t cb, struct c_class *cls)
 	
 	return ((*cb)(ch, &key, &data));
 }
-
-static int 
-c_thr_add(struct c_class *cls, struct c_thr *thr)
-{
-	struct c_obj *o = (struct c_obj *)thr;
-	struct c_cache *ch = &cls->c_children;
-	
-	DBT key;
-	DBT data;
-	
-	bcopy(thr->c_tid, &o->c_cookie, sizeof(o->c_cookie));
-	
-	key.data = &o->c_cookie;
-	key.size = sizeof(o->c_cookie);
-	
-	o->c_size = cls->c_obj.c_size;
-	data.size = o->c_size;
-	data.data = o;
-	
-	return (c_cache_add(ch, &key, &data));
-}
-
-static int 
-c_thr_del(struct c_class *cls, struct c_thr *thr)
-{
-	struct c_obj *o = (struct c_obj *)thr;
-	struct c_cache *ch = &cls->c_children;
-	
-	DBT key;
-	DBT data;
-	
-	key.data = &o->c_cookie;
-	key.size = sizeof(o->c_cookie);
-	
-	if (c_cache_del(ch, &key, &data))
-		return (-1);
-	
-	free(data.data);
-	
-	return (0);
-}
-
