@@ -65,7 +65,7 @@ sod_test(void *arg)
 {
 	int srv;
 	struct c_msg buf;
-	struct sod_header sh;
+	long id;
 	uint32_t state;
 	char *tok;
 	
@@ -74,8 +74,7 @@ sod_test(void *arg)
 		
 	srv = *(int *)arg;	
 		
-	(void)memset(&sh, 0, sizeof(sh));
-
+	id = 0;	
 	state = SOD_AUTH_REQ;
 	tok = user;
 	
@@ -88,7 +87,7 @@ sod_test(void *arg)
 /*
  * Create message.
  */ 
-			sod_prepare_msg(tok, state, &sh, &buf);
+			sod_prepare_msg(tok, state, id, &buf);
 		
 			if (sod_handle_msg(sod_send_msg, srv, &buf) < 0) {
 				syslog(LOG_ERR, "Can't send PAM_USER as request\n");
@@ -110,17 +109,10 @@ sod_test(void *arg)
 /*
  * Cache for conversation need credentials.
  */
-				sh.sh_cookie = buf.sb_h.sh_cookie;
-				sh.sh_tid = buf.sb_h.sh_tid;
+				id = buf.msg_id;
 			} 
-			
-			if (buf.sb_h.sh_cookie != sh.sh_cookie) {
-				syslog(LOG_ERR, "Invalid cookie received");
-				state = 0;
-				break;
-			}
 				
-			if (buf.sb_h.sh_tid != sh.sh_tid) {
+			if (buf.msg_id != id) {
 				syslog(LOG_ERR, "Invalid tid received");
 				state = 0;
 				break;

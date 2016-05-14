@@ -71,6 +71,7 @@ typedef ca_state_fn_t 	(*ca_state_t)(void *);
 
 struct ca_softc {
 	struct c_thr 	sc_thr; 	/* binding, pthread(3) */
+#define sc_cookie 	sc_thr.c_obj.c_cookie
 	
 	char sc_hname[C_NMAX + 1];
 	char sc_uname[C_NMAX + 1];
@@ -267,23 +268,21 @@ ca_conv(int num_msg, const struct pam_message **msg,
 		if (style < 0)
 			break; 
 					
-		c_msg_prepare(msg[i]->msg, SOD_AUTH_NAK, sc, sc->sc_buf);
+		c_msg_prepare(msg[i]->msg, SOD_AUTH_NAK, 
+			sc->sc_cookie, sc->sc_msg);
 /*
  * Request PAM_AUTHTOK.
  */				
-		if (c_msg_handle(c_msg_send, sc->sc_sock_rmt, sc->sc_buf) < 0)
+		if (c_msg_handle(c_msg_send, sc->sc_sock_rmt, sc->sc_msg) < 0)
 			break;
 /*
  * Await response from applicant.
  */	
-		if (c_msg_handle(c_msg_recv, sc->sc_sock_rmt, sc->sc_buf) < 0)
+		if (c_msg_handle(c_msg_recv, sc->sc_sock_rmt, sc->sc_msg) < 0)
 			break;
 	
-		if (sc->sc_msg->msg_h.sh_cookie != ap->ap_thr.cobj_cookie)	
+		if (sc->sc_msg->msg_id != sc->sc_cookie)	
 			break;	
-	
-		if (sc->sc_msg->msg_h.sh_tid != (sod_tid_t)ap->ap_thr.cobj_id)
-			break;
 			
 		if (sc->sc_msg->msg_code != SOD_AUTH_REQ)
 			break;
@@ -296,7 +295,7 @@ syslog(LOG_ERR, "%s: rx: %s\n", __func__, sc->sc_msg->msg_tok);
 #endif /* C_OBJ_DEBUG */	
 				
 		(void)strncpy(tok[i].resp, sc->sc_msg->msg_tok, C_NMAX);
-		(void)memset(sc->sc_buf, 0, sizeof(*sc->sc_buf));
+		(void)memset(sc->sc_msg, 0, sizeof(*sc->sc_msg));
 	}
 	
 	if (i < q) {
@@ -343,11 +342,10 @@ c_authenticator_start(void *arg)
 	if (pthread_cond_wait(&sc->c_thr.c_cv, &sc->c_thr.c_mtx) == 0)
 		ca_state = (ca_state_fn_t)ap_establish;	
 	
-	pthread_mutex_unlock(&sc->c_thr.c_mtx);
-	
 	while (fn != NULL)
 		fn = (ca_state_t)(*fn)(sc);
-
+		
+	pthread_mutex_unlock(&sc->c_thr.c_mtx);
 out:	
 	return (arg);
 }	
@@ -368,15 +366,12 @@ c_authenticator_establish(void *arg)
 syslog(LOG_ERR, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */	
 	
-	if (c_msg_handle(c_msg_recv, sc->sc_sock_rmt, sc->sc_buf) < 0) 
-		(*ap->ap_thr.cobj_exit)(EX_OSERR, __func__, sc);
+	if (c_msg_handle(c_msg_recv, sc->sc_sock_rmt, sc->sc_msg) < 0) 
+		goto out;
 /*
- * An running libap instance cannot send messages to itself.
- */
-	if (sc->sc_msg->msg_h.sh_cookie == ap->ap_thr.cobj_cookie)	
-		goto out;	
-		
-	if (sc->sc_msg->msg_h.sh_tid == (sod_tid_t)ap->ap_thr.cobj_id)
+ * An running instance cannot send messages to itself.
+ */	
+	if (sc->sc_msg->msg_id == sc->sc_cookie)
 		goto out;
 /*
  * State transition, if any.
@@ -410,7 +405,6 @@ c_authenticator_authenticate(void *arg)
 	int ask = 0, cnt = 0;
 	uint32_t resp;
 
-	
 	if ((sc = arg) == NULL)
 		goto out;
 
@@ -503,7 +497,7 @@ syslog(LOG_ERR, "%s\n", __func__);
 	if (ap->ap_rv == PAM_SUCCESS) 
 		resp = SOD_AUTH_ACK;
 			
-	c_msg_prepare(ap->sc_uname, resp, sc, sc->sc_buf);
+	c_msg_prepare(ap->sc_uname, resp, sc, sc->sc_msg);
 	ca_state = (ca_state_fn_t)ap_response;
 out:	
 	return (ca_state);
@@ -525,7 +519,7 @@ c_authenticator_response(void *arg)
 syslog(LOG_ERR, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */
 
-	if (c_msg_handle(c_msg_send, sc->sc_sock_rmt, sc->sc_buf) < 0)
+	if (c_msg_handle(c_msg_send, sc->sc_sock_rmt, sc->sc_msg) < 0)
 		(*ap->ap_thr.cobj_exit)(EX_OSERR, __func__, sc);
 out:	
 	return (ca_state);

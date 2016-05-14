@@ -30,7 +30,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
-#include <c_obj.h>
 #include <c_msg.h>
 
 /*
@@ -38,7 +37,7 @@
  */
  
 struct c_msg {
-	struct c_obj 	msg_h; 
+	long 		msg_id;
 	uint32_t 	msg_code; 	/* encodes request or response */
 	char 	msg_tok[C_NMAX + 1];
 };

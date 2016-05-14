@@ -64,14 +64,11 @@ c_msg_prepare(const char *s, uint32_t code, long id, struct c_msg *msg)
 	if (msg != NULL) {
 		(void)memset(msg, 0, sizeof(*msg));
 	
-		if ((sh = thr) != NULL) {
-			sb->sb_h.sh_cookie = sh->sh_cookie;	
-			sb->sb_h.sh_tid = sh->sh_tid;		
-		}
-		sb->sb_code = code;
+		msg->msg_id = id;
+		msg->msg_code = code;
 	
 		if (s != NULL) 
-			(void)strncpy(sb->sb_tok, s, SOD_NMAX);
+			(void)strncpy(msg->msg_tok, s, SOD_NMAX);
 	}
 }
 
