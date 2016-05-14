@@ -30,6 +30,10 @@
 typedef struct c_thr * 	(*ca_create_t)(int, int);
 typedef int 	(*ca_destroy_t)(struct c_thr *);
 
+/*
+ * Public interface.
+ */
+
 struct c_authenticator {
 	ca_create_t 	ca_create;
 	ca_destroy_t 	ca_destroy;

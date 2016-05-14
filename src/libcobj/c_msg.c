@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 Henning Matyschok
+ * Copyright (c) 2015, 2016 Henning Matyschok
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@
  * Generating set contains SPI for MPI, sod message buffer.
  */
 
-#include "c_msg.h"
+#include <c_msg.h>
 
 /*
  * Allocates n message primitives.
@@ -45,24 +45,24 @@
 struct c_msg * 
 c_msg_alloc(size_t n)
 {
-	struct c_msg *sb = NULL;
+	struct c_msg *msg = NULL;
 	
 	if (n <= SOD_QLEN)
-		sb = calloc(n, SOD_BUF_LEN);
+		msg = calloc(n, C_MSG_LEN);
 
-	return (sb);
+	return (msg);
 }
 
 /*
  * Fills message buffer with attributes, if any.
  */
 void 
-c_msg_prepare(const char *s, uint32_t code, void *thr, struct c_msg *sb)
+c_msg_prepare(const char *s, uint32_t code, long id, struct c_msg *msg)
 {
 	struct c_header *sh = NULL;
 	
-	if (sb != NULL) {
-		(void)memset(sb, 0, sizeof(*sb));
+	if (msg != NULL) {
+		(void)memset(msg, 0, sizeof(*msg));
 	
 		if ((sh = thr) != NULL) {
 			sb->sb_h.sh_cookie = sh->sh_cookie;	
@@ -79,50 +79,50 @@ c_msg_prepare(const char *s, uint32_t code, void *thr, struct c_msg *sb)
  * Wrapper for sendmsg(2).
  */
 ssize_t 
-c_msg_send(int s, struct msghdr *msg, int flags)
+c_msg_send(int s, struct msghdr *mh, int flags)
 {
-	return (sendmsg(s, msg, flags));
+	return (sendmsg(s, mh, flags));
 }
 
 /*
  * Wrapper for recvmsg(2).
  */
 ssize_t 
-c_msg_recv(int s, struct msghdr *msg, int flags)
+c_msg_recv(int s, struct msghdr *mh, int flags)
 {
-	return (recvmsg(s, msg, flags));
+	return (recvmsg(s, mh, flags));
 }
 
 /* 
  * Performs MPI exchange via callback.  
  */
 int
-c_msg_handle(c_msg_t c_msg, int s, struct c_msg *sb)
+c_msg_handle(c_msg_fn_t c_msg_fn, int s, struct c_msg *msg)
 {
 	int eval = -1;
 	ssize_t len;
 	struct iovec vec;
-	struct msghdr msg;
+	struct msghdr mh;
 
-	if (sb == NULL)
+	if (msg == NULL)
 		goto out;
 
 	if (c_msg == NULL)
 		goto out;
 
-	if ((len = sizeof(*sb)) != SOD_BUF_LEN)
+	if ((len = sizeof(*msg)) != C_MSG_LEN)
 		goto out;
 
-	if (c_msg == c_msg_recv || c_msg == c_msg_send) {
-		vec.iov_base = sb;
+	if (c_msg_fn == c_msg_recv || c_msg_fn == c_msg_send) {
+		vec.iov_base = msg;
 		vec.iov_len = len;
 	
-		(void)memset(&msg, 0, sizeof(msg));
+		(void)memset(&msg, 0, sizeof(mh));
 	
 		msg.msg_iov = &vec;
 		msg.msg_iovlen = 1;			
 		
-		if ((*c_msg)(s, &msg, 0) == len)
+		if ((*c_msg_fn)(s, &mh, 0) == len)
 			eval = 0;	
 	}
 out:
@@ -134,10 +134,10 @@ out:
  * releases bound ressources.
  */
 void 
-c_free_msg(struct c_msg *sb)
+c_free_msg(struct c_msg *msg)
 {
-	if (sb != NULL) {
-		(void)memset(sb, 0, sizeof(*sb));
-		free(sb);
+	if (msg != NULL) {
+		(void)memset(msg, 0, sizeof(*msg));
+		free(msg);
 	}
 }

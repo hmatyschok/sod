@@ -40,11 +40,15 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#include <c_authenticator.h>
+
 /*
  * Simple sign-on service on demand daemon - sod
  */
 
-#include <c_authenticator.h>
+#define SOD_WORK_DIR 	"/"
+#define SOD_PID_FILE 	"/var/run/sod.pid"
+#define SOD_SOCK_FILE 	"/var/run/sod.sock"
 
 static pid_t 	pid;
 static pthread_t 	tid;

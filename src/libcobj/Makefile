@@ -24,9 +24,9 @@
 #
 # version=0.1
 
-LIB=	sod
+LIB=	cobj
 
-CFLAGS+= 	-DSOD_DEBUG
+CFLAGS+= 	-DC_OBJ_DEBUG
 
 LDADD=	-lpam -lpthread -lutil
 
@@ -34,10 +34,11 @@ SHLIB_MAJOR=1
 SHLIB_MINOR=0
 
 SRCS=	c_obj.c \
-		c_authenticator.c \
-		...
+		c_msg.c \
+		c_authenticator.c 
 
 INCS=	c_obj.h \
+		c_msg.h \
 		c_authenticator.h \
 		...
 

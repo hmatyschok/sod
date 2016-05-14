@@ -30,6 +30,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
+#define C_NMAX 	127
 
 typedef void * 	(*c_class_init_t)(void *);
 typedef int 	(*c_class_free_t)(void *);
@@ -38,7 +39,7 @@ typedef int 	(*c_class_del_t)(void *);
 
 typedef void *	(*c_obj_create_t)(void *);
 typedef void *	(*c_obj_start_t)(void *);
-typedef int 	(*c_obj_stop_t)(void *);
+typedef void 	(*c_obj_stop_t)(void *);
 typedef int 	(*c_obj_destroy_t)(void *, void *);
 
 struct c_methods {

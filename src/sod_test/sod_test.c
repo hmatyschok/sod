@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015 Henning Matyschok
+ * Copyright (c) 2015, 2016 Henning Matyschok
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,15 +40,15 @@
  * Simple test.
  */
  
-#include <sod_msg.h>
+#include <c_msg.h>
 
 static pthread_t 	tid;
 
 static const int 	max_arg = 3;
 
-static char 	cmd[SOD_NMAX + 1];
-static char 	user[SOD_NMAX + 1];
-static char 	pw[SOD_NMAX + 1];
+static char 	cmd[C_NMAX + 1];
+static char 	user[C_NMAX + 1];
+static char 	pw[C_NMAX + 1];
 
 static const char 	*sock_file = SOD_SOCK_FILE;
 
@@ -64,7 +64,7 @@ void *
 sod_test(void *arg)
 {
 	int srv;
-	struct sod_buf buf;
+	struct c_msg buf;
 	struct sod_header sh;
 	uint32_t state;
 	char *tok;
@@ -178,15 +178,15 @@ main(int argc, char **argv)
 	if (atexit(cleanup) < 0)
 		errx(EX_OSERR, "Can't register exit handle");
 	
-	(void)strncpy(cmd, argv[s++], SOD_NMAX);
+	(void)strncpy(cmd, argv[s++], C_NMAX);
 		
 	if (argc != max_arg)
 		usage();
 /*
  * Cache arguments and prepare buffer.
  */		
-	(void)strncpy(user, argv[s++], SOD_NMAX);
-	(void)strncpy(pw, argv[s], SOD_NMAX);	
+	(void)strncpy(user, argv[s++], C_NMAX);
+	(void)strncpy(pw, argv[s], C_NMAX);	
 	(void)memset(&sap, 0, sizeof(sap));
 /*
  * Connect with sod instance.
