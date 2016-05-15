@@ -34,20 +34,21 @@
 
 typedef void * 	(*c_class_init_t)(void *);
 typedef int 	(*c_class_free_t)(void *);
-typedef int 	(*c_class_add_t)(void *);
-typedef int 	(*c_class_del_t)(void *);
 
 typedef void *	(*c_obj_create_t)(void *);
 typedef void *	(*c_obj_start_t)(void *);
 typedef void 	(*c_obj_stop_t)(void *);
 typedef int 	(*c_obj_destroy_t)(void *, void *);
 
+/*
+ * Implements generic interface. 
+ */
 struct c_methods {
 	c_class_init_t 		cm_class_init;
-	c_class_add_t 		cm_class_add;
-	c_class_del_t 		cm_class_del;
 	c_class_free_t 		cm_class_free;
-	
+/*
+ * Methods implemets life-cycle of an instance.  
+ */	
 	c_obj_create_t 		cm_obj_create;
 	c_obj_start_t 		cm_obj_start;
 	c_obj_stop_t 		cm_obj_stop;
@@ -65,6 +66,9 @@ struct c_obj {
 };
 TAILQ_HEAD(c_obj_hd, c_obj);
 
+/*
+ * Implements generic cache. 
+ */
 struct c_cache {
 	struct c_obj_hd 	ch_hd;
 	DB 	*ch_db;
@@ -75,17 +79,28 @@ struct c_cache {
  */
 struct c_thr {
 	struct c_obj 	c_obj;
-	
+/*
+ * Attcibutes, pthread(3).
+ */	
 	pthread_cond_t 	c_cv;
 	pthread_mutex_t 	c_mtx;
 	pthread_t 	c_tid;
 };
 
+/*
+ * Implements class.
+ */
 struct c_class {
 	struct c_obj 		c_obj;
 	struct c_cache 		c_children;
 	struct c_cache 		c_instances;
+/*
+ * From parent inherited interface.
+ */
 	struct c_methods 		c_base;
+/*
+ * Public interface.
+ */
 	void 	*c_methods;
 };
 

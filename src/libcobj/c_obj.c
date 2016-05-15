@@ -46,7 +46,7 @@
  * Set contains abstract components.
  */
 
-typedef int  	(*c_cache_cb_t)(struct c_cache *, DBT *, DBT *);
+typedef int  	(*c_cache_fn_t)(struct c_cache *, DBT *, DBT *);
 
 static int 	c_cache_init(struct c_cache *);
 static int 	c_cache_add(struct c_cache *, DBT *, DBT *);
@@ -54,20 +54,16 @@ static int 	c_cache_get(struct c_cache *, DBT *, DBT *);
 static int 	c_cache_del(struct c_cache *, DBT *, DBT *);
 static int 	c_cache_free(struct c_cache *);
 
-static int 	c_class_cache_opt(c_cache_cb_t, struct c_cache *, 
+static int 	c_class_cache_opt(c_cache_fn_t, struct c_cache *, 
 	struct c_class *);
 
 static void *	c_class_init(void *);
 static int 	c_class_free(void *);
-static int 	c_class_add(void *);
-static int 	c_class_del(void *);
 static void * 	c_thr_create(void *);
 static void * 	c_thr_destroy(void *);
 
 static void * 	c_nop_init(void *);
 static int 	c_nop_free(void *);
-static int 	c_nop_add(void *);
-static int 	c_nop_del(void *);
 static void * 	c_nop_create(void *);
 static void * 	c_nop_start(void *);
 static int 	c_nop_stop(void *);
@@ -82,8 +78,6 @@ static int 	c_nop_destroy(void *);
  */ 
 static struct c_methods c_nop = {
 	.cm_class_init 		= c_nop_init,
-	.cm_class_add 		= c_nop_add,
-	.cm_class_del 		= c_nop_del,
 	.cm_class_free 		= c_nop_free,
 	.cm_obj_create 		= c_nop_create,
 	.cm_obj_start 		= c_nop_start,
@@ -107,8 +101,6 @@ static struct c_class c_base_class = {
 	},
 	.c_base = {
 		.cm_class_init 		= c_class_init,
-		.cm_class_add 		= c_class_add,
-		.cm_class_del 		= c_class_del,
 		.cm_class_free 		= c_class_free,
 		.cm_obj_create 		= c_thr_create,
 		.cm_obj_start 		= c_nop_start,
@@ -192,7 +184,7 @@ c_thr_create(void *arg)
 	data.size = thr->c_obj.c_size;
 	data.data = thr;
 	
-	if (c_cache_add(&cls->c_children, &key, &data))
+	if (c_cache_add(&cls->c_instances, &key, &data))
 		goto bad3;
 out:		
 	return (thr);
@@ -209,8 +201,9 @@ bad:
 }
 
 /*
- * Release lock, if any and release by pthread(3) 
- * private data bound ressources.
+ * Release lock, if any and release 
+ * by pthread(3) private data bound 
+ * ressources.
  */
 static int
 c_thr_destroy(void *arg0, void *arg1)
@@ -231,14 +224,9 @@ c_thr_destroy(void *arg0, void *arg1)
 	if ((cls = arg0) == NULL)
 		goto out;
 /*
- * Verify, if called component set exists.
- */	
-	if (cls->c_base == NULL)
-		goto out;
-/*
  * An abstract component cannot be destroyed.
  */
-	if (cls->c_cookie == c_base_class.c_cookie)
+	if (cls->c_obj.c_cookie == c_base_class.c_obj.c_cookie)
 		goto out;
 /*
  * Release pthread(3). This operation can't fail because
@@ -255,10 +243,10 @@ c_thr_destroy(void *arg0, void *arg1)
 	
 	(void)memset(&data, 0, sizeof(data));
 	
-	if (c_cache_del(ch, &key, &data))
-		goto out;
+	rv = c_cache_del(&cls->c_instances, &key, &data);
 	
-	free(data.data);
+	if (rv == 0) 
+		free(data.data);
 out:		
 	return (rv);
 }
@@ -282,49 +270,14 @@ c_class_init(void *arg)
 		c_cache_free(cls->c_children);
 		return (NULL);
 	}
-	cls->c_base = cls->c_methods;
 	
-	return (&cls->c_methods);	
-}
-
-static int
-c_class_add(void *arg)
-{
-	struct c_class *cls;
-	struct c_class *bc;
-	
-	if ((cls = arg) == NULL) 
-		return (-1);
-	
-	bc = &c_base_class;
-	
-	if (cls == bc)
-		return (-1);
-	
-	if (c_cache_op(bc->c_children, c_cache_add, cls))
-		return (-1);
+	if (cls != &c_base_class) {
+		if (c_cache_op(&c_base_class.c_children, c_cache_add, cls))
+			return (NULL);
 		
-	return (0);
-}
-
-static int
-c_class_del(void *arg)
-{
-	struct c_class *cls;
-	struct c_class *bc;
-	
-	if ((cls = arg) == NULL) 
-		return (-1);
-	
-	bc = &c_base_class;
-	
-	if (cls == bc)
-		return (-1);
-		
-	if (c_class_op(bc->c_children, c_cache_del, cls))
-		return (-1);
-		
-	return (0);
+		cls->c_base = c_base_class.c_base;
+	}
+	return (&cls->c_base);	
 }
 
 static int 
@@ -341,8 +294,12 @@ c_class_free(void *arg)
 	if (c_cache_free(cls->c_instances))
 		return (-1);
 
-	cls->c_base = c_nop;
-
+	if (cls != &c_base_class) {
+		if (c_cache_op(&c_base_class.c_children, c_cache_del, cls))
+			return (-1);
+		
+		cls->c_base = c_nop;
+	}
 	return (0);	
 }
 
@@ -361,21 +318,7 @@ static int
 c_nop_free(void *arg)
 {
 
-	return (-1);	
-}
-
-static int
-c_nop_add(void *arg)
-{
-		
-	return (-1);
-}
-
-static int
-c_nop_del(void *arg)
-{
-		
-	return (-1);
+	return (0);	
 }
 
 /*
@@ -396,18 +339,17 @@ c_nop_start(void *arg)
 	return (arg);
 }
 
-static int 	
+static void 	
 c_nop_stop(void *arg)
 {
 
-	return (arg);
 }
 
 static int 	
-c_nop_destroy(void *arg)
+c_nop_destroy(void *arg0, void *arg1)
 {
 
-	return (arg);
+	return (0);
 }
 
 /******************************************************************************
@@ -504,7 +446,7 @@ c_cache_free(struct c_cache *ch)
 }
 
 static int
-c_class_cache_opt(c_cache_cb_t cb, struct c_cache *ch, struct c_class *cls)
+c_class_cache_opt(c_cache_fn_t fn, struct c_cache *ch, struct c_class *cls)
 {
 	DBT key;
 	DBT data;
@@ -515,5 +457,5 @@ c_class_cache_opt(c_cache_cb_t cb, struct c_cache *ch, struct c_class *cls)
 	data.data = cls;
 	data.size = sizeof(*cls);
 	
-	return ((*cb)(ch, &key, &data));
+	return ((*fn)(ch, &key, &data));
 }

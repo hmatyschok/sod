@@ -144,10 +144,6 @@ c_authenticator_class_init(void)
 	if ((cm = (*cm->cm_class_init)(this)) == NULL)
 		return (NULL);
 
-	if ((*cm->cm_class_add)(this)) {
-		(void)(*cm->cm_class_free)(this);
-		return (NULL);
-	}
 	cm->cm_obj_start = ca_start;
 	cm->cm_obj_start = ca_stop;
 	
