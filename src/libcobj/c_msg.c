@@ -34,7 +34,7 @@
 #include <unistd.h>
 
 /*
- * Generating set contains SPI for MPI, sod message buffer.
+ * Generating set contains Message primitives.
  */
 
 #include <c_msg.h>
@@ -47,9 +47,10 @@ c_msg_alloc(size_t n)
 {
 	struct c_msg *msg = NULL;
 	
-	if (n <= SOD_QLEN)
+	if (n <= C_MSG_QLEN) {
 		msg = calloc(n, C_MSG_LEN);
-
+		msg->msg_size = C_MSG_LEN;
+	}
 	return (msg);
 }
 
@@ -59,8 +60,6 @@ c_msg_alloc(size_t n)
 void 
 c_msg_prepare(const char *s, uint32_t code, long id, struct c_msg *msg)
 {
-	struct c_header *sh = NULL;
-	
 	if (msg != NULL) {
 		(void)memset(msg, 0, sizeof(*msg));
 	
@@ -96,10 +95,9 @@ c_msg_recv(int s, struct msghdr *mh, int flags)
 int
 c_msg_handle(c_msg_fn_t c_msg_fn, int s, struct c_msg *msg)
 {
-	int eval = -1;
-	ssize_t len;
 	struct iovec vec;
 	struct msghdr mh;
+	int eval = -1;
 
 	if (msg == NULL)
 		goto out;
@@ -107,19 +105,19 @@ c_msg_handle(c_msg_fn_t c_msg_fn, int s, struct c_msg *msg)
 	if (c_msg == NULL)
 		goto out;
 
-	if ((len = sizeof(*msg)) != C_MSG_LEN)
+	if ((len = msg->msg_size) != C_MSG_LEN)
 		goto out;
 
 	if (c_msg_fn == c_msg_recv || c_msg_fn == c_msg_send) {
 		vec.iov_base = msg;
-		vec.iov_len = len;
+		vec.iov_len = msg->msg_size;
 	
 		(void)memset(&msg, 0, sizeof(mh));
 	
 		msg.msg_iov = &vec;
 		msg.msg_iovlen = 1;			
 		
-		if ((*c_msg_fn)(s, &mh, 0) == len)
+		if ((*c_msg_fn)(s, &mh, 0) == msg->msg_size)
 			eval = 0;	
 	}
 out:

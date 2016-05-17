@@ -32,6 +32,8 @@
 
 #define C_NMAX 	127
 
+struct c_obj;
+
 typedef void * 	(*c_class_init_t)(void *);
 typedef int 	(*c_class_free_t)(void *);
 
@@ -56,10 +58,12 @@ struct c_methods {
 };
 
 /*
- * c_cookie = $( date -u '+%s' )
+ * Implements generic object.
+ *
+ * c_id = $( date -u '+%s' )
  */
 struct c_obj {
-	long 	c_cookie; 	/* identifier */
+	long 	c_id; 	/* identifier */
 	size_t 	c_size;
 	
 	TAILQ_NEXT(c_obj) c_next;

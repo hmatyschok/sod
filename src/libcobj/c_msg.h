@@ -37,11 +37,14 @@
  */
  
 struct c_msg {
-	long 		msg_id;
-	uint32_t 	msg_code; 	/* encodes request or response */
+	struct c_obj 	msg_obj;
+#define msg_id 		msg_obj.c_id
+#define msg_size 	msg_obj.c_size	
+	int 	msg_code; 	/* encodes request or response */
 	char 	msg_tok[C_NMAX + 1];
 };
 #define C_MSG_LEN 	(sizeof(struct c_msg))
+#define C_MSG_QLEN 	13
 
 /*
  * Service Primitives (SPI).

@@ -96,7 +96,7 @@ static struct c_methods c_nop = {
  */
 static struct c_class c_base_class = {
 	.c_obj = {
-		.c_cookie 		= C_BASE_CLASS,
+		.c_id 		= C_BASE_CLASS,
 		.c_size 		= C_BASE_CLASS_SIZE,
 	},
 	.c_base = {
@@ -111,6 +111,10 @@ static struct c_class c_base_class = {
 };
 
 
+/******************************************************************************
+ * Public Class-methods.
+ ******************************************************************************/
+
 void * 
 c_base_class_init(void)
 {
@@ -123,6 +127,63 @@ c_base_class_free(void)
 
 	return (c_class_free(&c_base_class));	
 }
+
+/******************************************************************************
+ * Protected Class-methods.
+ ******************************************************************************/
+
+/*
+ * Generic class-methods.
+ */
+
+static void *
+c_class_init(void *arg)
+{
+	struct c_class *cls;
+	
+	if ((cls = arg) == NULL) 
+		return (NULL);
+		
+	if (c_cache_init(cls->c_children))
+		return (NULL);
+
+	if (c_cache_init(cls->c_instances)) {
+		c_cache_free(cls->c_children);
+		return (NULL);
+	}
+	
+	if (cls != &c_base_class) {
+		if (c_cache_op(c_cache_add, &c_base_class.c_children, cls))
+			return (NULL);
+		
+		cls->c_base = c_base_class.c_base;
+	}
+	return (&cls->c_base);	
+}
+
+static int 
+c_class_free(void *arg)
+{
+	struct c_class *cls;
+	
+	if ((cls = arg) == NULL) 
+		return (-1);
+	
+	if (c_cache_free(cls->c_children))
+		return (-1);
+		
+	if (c_cache_free(cls->c_instances))
+		return (-1);
+
+	if (cls != &c_base_class) {
+		if (c_cache_op(c_cache_del, &c_base_class.c_children, cls))
+			return (-1);
+		
+		cls->c_base = c_nop;
+	}
+	return (0);	
+}
+
 
 /*
  * An abstract component acts as factory for generating a component
@@ -154,7 +215,7 @@ c_thr_create(void *arg)
 /*
  * An abstract component cannot instantiate itself.
  */
-	if (cls->c_obj.c_cookie == c_base_class.c_obj.c_cookie)
+	if (cls->c_obj.c_id == c_base_class.c_obj.c_id)
 		goto out;
 /*
  * Allocate.
@@ -175,10 +236,10 @@ c_thr_create(void *arg)
 	if (pthread_create(&thr->c_tid, NULL, cls->c_base->c_start, thr) != 0) 
 		goto bad2;
 
-	bcopy(thr->c_tid, &thr->c_obj.c_cookie, sizeof(thr->c_obj.c_cookie));
+	bcopy(thr->c_tid, &thr->c_obj.c_id, sizeof(thr->c_obj.c_id));
 	
-	key.data = &thr->c_obj.c_cookie;
-	key.size = sizeof(thr->c_obj.c_cookie);
+	key.data = &thr->c_obj.c_id;
+	key.size = sizeof(thr->c_obj.c_id);
 	
 	thr->c_obj.c_size = cls->c_obj.c_size;
 	data.size = thr->c_obj.c_size;
@@ -226,7 +287,7 @@ c_thr_destroy(void *arg0, void *arg1)
 /*
  * An abstract component cannot be destroyed.
  */
-	if (cls->c_obj.c_cookie == c_base_class.c_obj.c_cookie)
+	if (cls->c_obj.c_id == c_base_class.c_obj.c_id)
 		goto out;
 /*
  * Release pthread(3). This operation can't fail because
@@ -238,8 +299,8 @@ c_thr_destroy(void *arg0, void *arg1)
 /*
  * Release object from database.
  */	
-	key.data = &thr->c_obj.c_cookie;
-	key.size = sizeof(thr->c_obj.c_cookie);
+	key.data = &thr->c_obj.c_id;
+	key.size = sizeof(thr->c_obj.c_id);
 	
 	(void)memset(&data, 0, sizeof(data));
 	
@@ -251,57 +312,10 @@ out:
 	return (rv);
 }
 
-/*
- * Generic class-methods.
- */
 
-static void *
-c_class_init(void *arg)
-{
-	struct c_class *cls;
-	
-	if ((cls = arg) == NULL) 
-		return (NULL);
-		
-	if (c_cache_init(cls->c_children))
-		return (NULL);
-
-	if (c_cache_init(cls->c_instances)) {
-		c_cache_free(cls->c_children);
-		return (NULL);
-	}
-	
-	if (cls != &c_base_class) {
-		if (c_cache_op(&c_base_class.c_children, c_cache_add, cls))
-			return (NULL);
-		
-		cls->c_base = c_base_class.c_base;
-	}
-	return (&cls->c_base);	
-}
-
-static int 
-c_class_free(void *arg)
-{
-	struct c_class *cls;
-	
-	if ((cls = arg) == NULL) 
-		return (-1);
-	
-	if (c_cache_free(cls->c_children))
-		return (-1);
-		
-	if (c_cache_free(cls->c_instances))
-		return (-1);
-
-	if (cls != &c_base_class) {
-		if (c_cache_op(&c_base_class.c_children, c_cache_del, cls))
-			return (-1);
-		
-		cls->c_base = c_nop;
-	}
-	return (0);	
-}
+/******************************************************************************
+ * Public methods.
+ ******************************************************************************/
 
 /*
  * Non-operations, class scope.
@@ -451,8 +465,8 @@ c_class_cache_opt(c_cache_fn_t fn, struct c_cache *ch, struct c_class *cls)
 	DBT key;
 	DBT data;
 	
-	key.data = &cls->c_cookie;
-	key.size = sizeof(cls->c_cookie);
+	key.data = &cls->c_id;
+	key.size = sizeof(cls->c_id);
 	
 	data.data = cls;
 	data.size = sizeof(*cls);

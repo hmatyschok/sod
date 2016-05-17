@@ -40,7 +40,7 @@
  * Simple test.
  */
  
-#include <c_msg.h>
+#include <c_authenticator.h>
 
 static pthread_t 	tid;
 
@@ -63,10 +63,9 @@ static void 	usage(void);
 void * 
 sod_test(void *arg)
 {
-	int srv;
 	struct c_msg buf;
+	int srv, state;
 	long id;
-	uint32_t state;
 	char *tok;
 	
 	if (arg == NULL)
@@ -75,31 +74,36 @@ sod_test(void *arg)
 	srv = *(int *)arg;	
 		
 	id = 0;	
-	state = SOD_AUTH_REQ;
+	state = C_AUTHENTICATOR_AUTH_REQ;
 	tok = user;
 	
-	while (state != 0) {
+	while (state) {
 /*
  * Select action.
  */
 		switch (state) {	
-		case SOD_AUTH_REQ:
+		case C_AUTHENTICATOR_AUTH_REQ:
 /*
  * Create message.
  */ 
-			sod_prepare_msg(tok, state, id, &buf);
+			c_msg_prepare(tok, state, id, &buf);
 		
-			if (sod_handle_msg(sod_send_msg, srv, &buf) < 0) {
-				syslog(LOG_ERR, "Can't send PAM_USER as request\n");
+			if (c_msg_handle(c_msg_send, srv, &buf) < 0) {
+				syslog(LOG_ERR, 
+					"Can't send PAM_USER as request\n");
 				state = 0;
 				break;
 			}
-			syslog(LOG_ERR, "tx: SOD_AUTH_REQ: %s\n", buf.sb_tok);		
+			syslog(LOG_ERR, 
+				"tx: C_AUTHENTICATOR_AUTH_REQ: %s\n", 
+				buf.sb_tok);		
 /*
  * Await response.
  */			
-			if (sod_handle_msg(sod_recv_msg, srv, &buf) < 0) {
-				syslog(LOG_ERR, "Can't receive SOD_AUTH_NAK "
+			if (c_msg_handle(c_msg_recv, srv, &buf) < 0) {
+				syslog(LOG_ERR, 
+					"Can't receive "
+					"C_AUTHENTICATOR_AUTH_NAK "
 					"as response");
 				state = 0;
 				break;
@@ -120,22 +124,26 @@ sod_test(void *arg)
 /*
  * Determine state transition.
  */
-			state = buf.sb_code;
+			state = buf.msg_code;
 			break;
-		case SOD_AUTH_NAK:
-			syslog(LOG_ERR, "rx: SOD_AUTH_NAK: %s", buf.sb_tok);
+		case C_AUTHENTICATOR_AUTH_NAK:
+			syslog(LOG_ERR, 
+				"rx: C_AUTHENTICATOR_AUTH_NAK: %s", 
+				buf.sb_tok);
 /*
  * Select for response need data.
  */		
-			state = SOD_AUTH_REQ; 
+			state = C_AUTHENTICATOR_AUTH_REQ; 
 			tok = pw;	
 			break;
-		case SOD_AUTH_ACK:
-			syslog(LOG_ERR, "rx: SOD_AUTH_ACK: PAM_SUCCESS\n");
+		case C_AUTHENTICATOR_AUTH_ACK:
+			syslog(LOG_ERR, 
+				"rx: C_AUTHENTICATOR_AUTH_ACK: PAM_SUCCESS\n");
 			state = 0;
 			break;
-		case SOD_AUTH_REJ:
-			syslog(LOG_ERR, "rx: SOD_AUTH_REJ: PAM_AUTH_ERR\n");
+		case C_AUTHENTICATOR_AUTH_REJ:
+			syslog(LOG_ERR, 
+				"rx: C_AUTHENTICATOR_AUTH_REJ: PAM_AUTH_ERR\n");
 			state = 0;
 			break;
 		default:

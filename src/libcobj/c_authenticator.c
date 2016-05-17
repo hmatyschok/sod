@@ -42,22 +42,11 @@
 
 #include <c_authenticator.h>
 
-#define C_AUTHENTICATOR_CLASS 	1421959420
-
 #define	C_AUTHENTICATOR_BACKOFF_DFLT 	3
 #define	C_AUTHENTICATOR_RETRIES_DFLT 	10
 
 #define	C_AUTHENTICATOR_PROMPT_DFLT		"login: "
 #define	C_AUTHENTICATOR_PW_PROMPT_DFLT	"Password:"
-
-#define C_AUTHENTICATOR_AUTH_REQ 	0x00000001
-#define C_AUTHENTICATOR_TERM_REQ 	0x00000002
-
-#define C_AUTHENTICATOR_AUTH_ACK 	(C_AUTHENTICATOR_AUTH_REQ|C_MSG_ACK)
-#define C_AUTHENTICATOR_AUTH_NAK 	(C_AUTHENTICATOR_AUTH_REQ|C_MSG_NAK)
-#define C_AUTHENTICATOR_AUTH_REJ 	(C_AUTHENTICATOR_AUTH_REQ|C_MSG_REJ)
-#define	C_AUTHENTICATOR_TERM_ACK 	(C_AUTHENTICATOR_TERM_REQ|C_MSG_ACK)
-#define C_AUTHENTICATOR_TERM_REJ 	(C_AUTHENTICATOR_TERM_REQ|C_MSG_REJ)
 
 /*
  * Recursively defined callback function. 
@@ -71,7 +60,7 @@ typedef ca_state_fn_t 	(*ca_state_t)(void *);
 
 struct ca_softc {
 	struct c_thr 	sc_thr; 	/* binding, pthread(3) */
-#define sc_cookie 	sc_thr.c_obj.c_cookie
+#define sc_id 	sc_thr.c_obj.c_id
 	
 	char sc_hname[C_NMAX + 1];
 	char sc_uname[C_NMAX + 1];
@@ -112,7 +101,7 @@ static struct c_authenticator c_authenticator_methods = {
 
 static struct c_class c_authenticator_class = {
 	.c_obj = {
-		.c_cookie 		= C_AUTHENTICATOR_CLASS,
+		.c_id 		= C_AUTHENTICATOR_CLASS,
 		.c_size 		= C_AUTHENTICATOR_SIZE,
 	},
 	.c_methods 		= &c_authenticator_methods,
@@ -136,7 +125,6 @@ c_authenticator_class_init(void)
 	struct c_methods *cm;
 
 	this = &c_authenticator_class;
-	cm = &this->c_base;
 
 	if ((cm = c_base_class_init()) == NULL)
 		return (NULL);
@@ -162,10 +150,7 @@ c_authenticator_class_free(void)
 
 	this = &c_authenticator_class;
 	cm = &this->c_base;
-
-	if ((cm->cm_class_del(this)))
-		return (-1);
-		
+	
 	return ((*cm->cm_class_free)(this));	
 }
 
@@ -265,7 +250,7 @@ ca_conv(int num_msg, const struct pam_message **msg,
 			break; 
 					
 		c_msg_prepare(msg[i]->msg, SOD_AUTH_NAK, 
-			sc->sc_cookie, sc->sc_msg);
+			sc->sc_id, sc->sc_msg);
 /*
  * Request PAM_AUTHTOK.
  */				
@@ -277,10 +262,10 @@ ca_conv(int num_msg, const struct pam_message **msg,
 		if (c_msg_handle(c_msg_recv, sc->sc_sock_rmt, sc->sc_msg) < 0)
 			break;
 	
-		if (sc->sc_msg->msg_id != sc->sc_cookie)	
+		if (sc->sc_msg->msg_id != sc->sc_id)	
 			break;	
 			
-		if (sc->sc_msg->msg_code != SOD_AUTH_REQ)
+		if (sc->sc_msg->msg_code != C_AUTHENTICATOR_AUTH_REQ)
 			break;
 	
 		if ((tok[i].resp = calloc(1, C_NMAX + 1)) == NULL) 
@@ -318,7 +303,7 @@ syslog(LOG_ERR, "%s: rx: %s\n", __func__, sc->sc_msg->msg_tok);
 }
 
 /******************************************************************************
- * Defines pthread(3) life-cycle for promoted transaction component           *
+ * Implements pthread(3) life-cycle for promoted transaction component.
  ******************************************************************************/
  
 /*
@@ -367,12 +352,12 @@ syslog(LOG_ERR, "%s\n", __func__);
 /*
  * An running instance cannot send messages to itself.
  */	
-	if (sc->sc_msg->msg_id == sc->sc_cookie)
+	if (sc->sc_msg->msg_id == sc->sc_id)
 		goto out;
 /*
  * State transition, if any.
  */
-	if (sc->sc_msg->msg_code == SOD_AUTH_REQ) 
+	if (sc->sc_msg->msg_code == C_AUTHENTICATOR_AUTH_REQ) 
 		ca_state = (ca_state_fn_t)ap_authenticate;
 	
 	if (ca_state == NULL)
