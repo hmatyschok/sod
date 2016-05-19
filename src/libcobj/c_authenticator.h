@@ -46,9 +46,14 @@ typedef int 	(*ca_destroy_t)(struct c_thr *);
  */
 
 struct c_authenticator {
+	struct c_obj 		ca_co;
+#define ca_id 	ca_co.co_id
+#define ca_len 	ca_co.co_len
 	ca_create_t 	ca_create;
 	ca_destroy_t 	ca_destroy;
 };
+#define C_AUTHENTICATOR 		1463677427
+#define C_AUTHENTICATOR_LEN 		(sizeof(struct c_authenticator))
 
 __BEGIN_DECLS
 struct c_authenticator * 	c_authenticator_class_init(void);

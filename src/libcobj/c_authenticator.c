@@ -61,7 +61,7 @@ typedef ca_state_fn_t 	(*ca_state_t)(void *);
 struct ca_softc {
 	struct c_thr 	sc_thr; 	/* binding, pthread(3) */
 #define sc_id 	sc_thr.c_obj.c_id
-	
+#define sc_len 	sc_thr.c_obj.c_len	
 	char sc_hname[C_NMAX + 1];
 	char sc_uname[C_NMAX + 1];
 	const char 	*sc_prompt;
@@ -77,7 +77,7 @@ struct ca_softc {
 	uint32_t 	sc_sock_rmt; 	/* fd, socket, applicant */
 	uint32_t 	sc_rv; 	/* tracks rv of pam(3) method calls */		
 };
-#define C_AUTHENTICATOR_SIZE (sizeof(struct ca_softc *sc,))
+#define C_AUTHENTICATOR_SOFTC_LEN (sizeof(struct ca_softc *sc,))
 
 static int 	c_authenticator_conv(int, const struct pam_message **, 
 	struct pam_response **, void *);
@@ -95,6 +95,10 @@ static int 	c_authenticator_destroy(struct c_thr *);
  ******************************************************************************/
  
 static struct c_authenticator c_authenticator_methods = {
+	.ca_co = {
+		.co_id 		= C_AUTHENTICATOR,
+		.co_len 		= C_AUTHENTICATOR_LEN,
+	},
 	.ca_create 		= c_authenticator_create,
 	.ca_destroy 	= c_authenticator_destroy,
 };
@@ -102,7 +106,7 @@ static struct c_authenticator c_authenticator_methods = {
 static struct c_class c_authenticator_class = {
 	.c_obj = {
 		.c_id 		= C_AUTHENTICATOR_CLASS,
-		.c_size 		= C_AUTHENTICATOR_SIZE,
+		.c_len 		= C_AUTHENTICATOR_SOFTC_LEN,
 	},
 	.c_public 		= &c_authenticator_methods,
 };

@@ -40,17 +40,16 @@
 #include <c_msg.h>
 
 /*
- * Allocates n message primitives.
+ * Allocate message primitive.
  */ 
 struct c_msg * 
-c_msg_alloc(size_t n)
+c_msg_alloc(void)
 {
-	struct c_msg *msg = NULL;
+	struct c_msg *msg;
 	
-	if (n <= C_MSG_QLEN) {
-		msg = calloc(n, C_MSG_LEN);
+	if ((msg = calloc(n, C_MSG_LEN)) != NULL) {
 		msg->msg_id = C_MSG;
-		msg->msg_size = C_MSG_LEN;
+		msg->msg_len = C_MSG_LEN;
 	}
 	return (msg);
 }
@@ -68,7 +67,7 @@ c_msg_prepare(const char *s, uint32_t code, long id, struct c_msg *msg)
 		msg->msg_code = code;
 	
 		if (s != NULL) 
-			(void)strncpy(msg->msg_tok, s, SOD_NMAX);
+			(void)strncpy(msg->msg_tok, s, C_NMAX);
 	}
 }
 
@@ -106,19 +105,19 @@ c_msg_handle(c_msg_fn_t c_msg_fn, int s, struct c_msg *msg)
 	if (c_msg == NULL)
 		goto out;
 
-	if ((len = msg->msg_size) != C_MSG_LEN)
+	if ((len = msg->msg_len) != C_MSG_LEN)
 		goto out;
 
 	if (c_msg_fn == c_msg_recv || c_msg_fn == c_msg_send) {
 		vec.iov_base = msg;
-		vec.iov_len = msg->msg_size;
+		vec.iov_len = msg->msg_len;
 	
 		(void)memset(&msg, 0, sizeof(mh));
 	
 		msg.msg_iov = &vec;
 		msg.msg_iovlen = 1;			
 		
-		if ((*c_msg_fn)(s, &mh, 0) == msg->msg_size)
+		if ((*c_msg_fn)(s, &mh, 0) == msg->msg_len)
 			eval = 0;	
 	}
 out:

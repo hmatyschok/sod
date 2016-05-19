@@ -53,7 +53,7 @@ typedef int 	(*c_destroy_t)(void *, void *);
  */
 struct c_obj {
 	long 	co_id; 	/* identifier */
-	size_t 	co_size;
+	size_t 	co_len;
 	
 	TAILQ_NEXT(c_obj) co_next;
 };
@@ -74,7 +74,7 @@ struct c_cache {
 struct c_methods {
 	struct c_obj 		cm_co;
 #define cm_id 	cm_co.co_id
-#define cm_size 	cm_co.co_size
+#define cm_len 	cm_co.co_len
 	c_init_t 		cm_init;
 	c_fini_t 		cm_free;
 /*
@@ -85,8 +85,9 @@ struct c_methods {
 	c_stop_t 		cm_stop;
 	c_destroy_t 		cm_destroy;
 };
-#define C_METHODS 	1463676933
-#define C_METHODS_SIZE 	(sizeof(struct c_methods))
+#define C_BASE 	1463676933
+#define C_NOP 	1463677298
+#define C_METHODS_LEN 	(sizeof(struct c_methods))
 
 /*
  * Implements class.
@@ -94,7 +95,7 @@ struct c_methods {
 struct c_class {
 	struct c_obj 		c_co;
 #define c_id 	c_co.co_id
-#define c_size 	c_co.co_size
+#define c_len 	c_co.co_len
 	struct c_cache 		c_children;
 	struct c_cache 		c_instances;
 /*
@@ -107,7 +108,7 @@ struct c_class {
 	void 	*c_public;
 };
 #define C_BASE_CLASS 	1463676824
-#define C_BASE_SIZE 	(sizeof(structc_class))
+#define C_BASE_LEN 	(sizeof(structc_class))
 
 
 /*
@@ -116,7 +117,7 @@ struct c_class {
 struct c_thr {
 	struct c_obj 	ct_co;
 #define ct_id 	ct_co.co_id
-#define ct_size 	ct_co.co_size
+#define ct_len 	ct_co.co_len
 /*
  * Attcibutes, pthread(3).
  */	

@@ -77,6 +77,10 @@ static int 	c_nop_destroy(void *);
  * Interface implements null-operations.
  */ 
 static struct c_methods c_nop = {
+	.cm_co = {
+		.co_id 		= C_NOP,
+		.co_len 		= C_METHODS_LEN,
+	},
 	.cm_init 		= c_nop_init,
 	.cm_fini 		= c_nop_fini,
 	.cm_create 		= c_nop_create,
@@ -97,9 +101,13 @@ static struct c_methods c_nop = {
 static struct c_class c_base_class = {
 	.c_obj = {
 		.c_id 		= C_BASE_CLASS,
-		.c_size 		= C_BASE_CLASS_SIZE,
+		.c_len 		= C_BASE_CLASS_LEN,
 	},
 	.c_base = {
+		.cm_co = {
+			.co_id 		= C_BASE,
+			.co_len 		= C_METHODS_LEN,
+		},
 		.cm_init 		= c_class_init,
 		.cm_fini 		= c_class_fini,
 		.cm_create 		= c_thr_create,
@@ -220,7 +228,7 @@ c_thr_create(void *arg)
 /*
  * Allocate.
  */
-	if ((thr = calloc(1, cls->c_size)) == NULL)
+	if ((thr = calloc(1, cls->c_len)) == NULL)
 		goto out;
 /*
  * On success, initialize generic properties.
@@ -241,8 +249,8 @@ c_thr_create(void *arg)
 	key.data = &thr->ct_id;
 	key.size = sizeof(thr->ct_id);
 	
-	thr->ct_size = cls->c_size;
-	data.size = thr->ct_size;
+	thr->ct_len = cls->c_len;
+	data.size = thr->ct_len;
 	data.data = thr;
 	
 	if (c_cache_add(&cls->c_instances, &key, &data))
