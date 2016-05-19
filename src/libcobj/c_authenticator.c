@@ -71,7 +71,7 @@ struct ca_softc {
 	struct pam_conv 	sc_pamc; 	/* during transaction used variable data */ 
 	struct passwd 	*sc_pwd;
 	
-	struct c_msg 	sc_msg; 	/* for transaction used buffer */
+	struct c_msg 	sc_buf; 	/* for transaction used buffer */
 
 	uint32_t 	sc_sock_srv; 	/* fd, socket, applicant */
 	uint32_t 	sc_sock_rmt; 	/* fd, socket, applicant */
@@ -79,16 +79,16 @@ struct ca_softc {
 };
 #define C_AUTHENTICATOR_SIZE (sizeof(struct ca_softc *sc,))
 
-static int 	ca_conv(int, const struct pam_message **, 
+static int 	c_authenticator_conv(int, const struct pam_message **, 
 	struct pam_response **, void *);
-static ca_state_fn_t 	ca_response(struct ca_softc *);
-static ca_state_fn_t 	ca_authenticate(struct ca_softc *);
-static ca_state_fn_t 	ca_establish(struct ca_softc *);
+static ca_state_fn_t 	c_authenticator_response(struct ca_softc *);
+static ca_state_fn_t 	c_authenticator_authenticate(struct ca_softc *);
+static ca_state_fn_t 	c_authenticator_establish(struct ca_softc *);
 
-static void * 	ap_start(void *); 
+static void * 	c_authenticator_start(void *); 
  
 static struct c_thr * 	c_authenticator_create(int, int);
-static void 	c_authenticator_destroy(struct c_thr *); 
+static int 	c_authenticator_destroy(struct c_thr *); 
 
 /******************************************************************************
  * Class-attributes.
@@ -139,7 +139,7 @@ c_authenticator_class_init(void)
 }
 
 /*
- * Unregisters class at parent class, iff there are no running instances. 
+ * Unregisters class at parent class, if there are no running instances. 
  */
 
 int  
@@ -200,7 +200,10 @@ c_authenticator_destroy(struct c_thr *thr)
 	struct c_class *this = &c_authenticator_class;
 	struct c_methods *base = &this->c_base;
 	
-	....
+	this = &c_authenticator_class;
+	cm = &this->c_base;
+	
+	...
 	
 	return (0);
 }
@@ -215,7 +218,7 @@ c_authenticator_destroy(struct c_thr *thr)
  * pam_authenticate(3) called pam_get_authtok(3).
  */
 static int 
-ca_conv(int num_msg, const struct pam_message **msg, 
+c_authenticator_conv(int num_msg, const struct pam_message **msg, 
 		struct pam_response **resp, void *data) 
 {
 	struct ca_softc *sc = NULL;
@@ -249,34 +252,34 @@ ca_conv(int num_msg, const struct pam_message **msg,
 		if (style < 0)
 			break; 
 					
-		c_msg_prepare(msg[i]->msg, SOD_AUTH_NAK, 
-			sc->sc_id, sc->sc_msg);
+		c_msg_prepare(msg[i]->msg, C_AUTHENTICATOR_AUTH_NAK, 
+			sc->sc_id, sc->sc_buf);
 /*
  * Request PAM_AUTHTOK.
  */				
-		if (c_msg_handle(c_msg_send, sc->sc_sock_rmt, sc->sc_msg) < 0)
+		if (c_msg_handle(c_msg_send, sc->sc_sock_rmt, &sc->sc_buf) < 0)
 			break;
 /*
  * Await response from applicant.
  */	
-		if (c_msg_handle(c_msg_recv, sc->sc_sock_rmt, sc->sc_msg) < 0)
+		if (c_msg_handle(c_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0)
 			break;
 	
-		if (sc->sc_msg->msg_id != sc->sc_id)	
+		if (sc->sc_buf->msg_id != sc->sc_id)	
 			break;	
 			
-		if (sc->sc_msg->msg_code != C_AUTHENTICATOR_AUTH_REQ)
+		if (sc->sc_buf->msg_code != C_AUTHENTICATOR_AUTH_REQ)
 			break;
 	
 		if ((tok[i].resp = calloc(1, C_NMAX + 1)) == NULL) 
 			break;
 			
 #ifdef C_OBJ_DEBUG
-syslog(LOG_ERR, "%s: rx: %s\n", __func__, sc->sc_msg->msg_tok);	
+syslog(LOG_ERR, "%s: rx: %s\n", __func__, sc->sc_buf->msg_tok);	
 #endif /* C_OBJ_DEBUG */	
 				
-		(void)strncpy(tok[i].resp, sc->sc_msg->msg_tok, C_NMAX);
-		(void)memset(sc->sc_msg, 0, sizeof(*sc->sc_msg));
+		(void)strncpy(tok[i].resp, sc->sc_buf->msg_tok, C_NMAX);
+		(void)memset(&sc->sc_buf, 0, sizeof(sc->sc_buf));
 	}
 	
 	if (i < q) {
@@ -347,17 +350,17 @@ c_authenticator_establish(void *arg)
 syslog(LOG_ERR, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */	
 	
-	if (c_msg_handle(c_msg_recv, sc->sc_sock_rmt, sc->sc_msg) < 0) 
+	if (c_msg_handle(c_msg_recv, sc->sc_sock_rmt, sc->sc_buf) < 0) 
 		goto out;
 /*
  * An running instance cannot send messages to itself.
  */	
-	if (sc->sc_msg->msg_id == sc->sc_id)
+	if (sc->sc_buf->msg_id == sc->sc_id)
 		goto out;
 /*
  * State transition, if any.
  */
-	if (sc->sc_msg->msg_code == C_AUTHENTICATOR_AUTH_REQ) 
+	if (sc->sc_buf->msg_code == C_AUTHENTICATOR_AUTH_REQ) 
 		ca_state = (ca_state_fn_t)ap_authenticate;
 	
 	if (ca_state == NULL)
@@ -366,7 +369,7 @@ syslog(LOG_ERR, "%s\n", __func__);
  * Create < hostname, user > tuple.
  */
 	if (gethostname(ap->sc_hname, C_NMAX) == 0) 
-		(void)strncpy(ap->sc_uname, sc->sc_msg->msg_tok, C_NMAX);
+		(void)strncpy(ap->sc_uname, sc->sc_buf->msg_tok, C_NMAX);
 	else
 		ca_state = NULL;
 out:	
@@ -478,7 +481,7 @@ syslog(LOG_ERR, "%s\n", __func__);
 	if (ap->ap_rv == PAM_SUCCESS) 
 		resp = SOD_AUTH_ACK;
 			
-	c_msg_prepare(ap->sc_uname, resp, sc, sc->sc_msg);
+	c_msg_prepare(ap->sc_uname, resp, sc, sc->sc_buf);
 	ca_state = (ca_state_fn_t)ap_response;
 out:	
 	return (ca_state);
@@ -500,14 +503,14 @@ c_authenticator_response(void *arg)
 syslog(LOG_ERR, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */
 
-	if (c_msg_handle(c_msg_send, sc->sc_sock_rmt, sc->sc_msg) < 0)
+	if (c_msg_handle(c_msg_send, sc->sc_sock_rmt, sc->sc_buf) < 0)
 		(*ap->ap_thr.cobj_exit)(EX_OSERR, __func__, sc);
 out:	
 	return (ca_state);
 }
 
 /*
- * By pthread_exit(3) implecitely called cleanup handler.
+ * Implecitely called cleanup handler.
  */
 static void  
 c_authenticator_stop(void *arg)

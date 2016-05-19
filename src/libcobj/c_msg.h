@@ -33,6 +33,16 @@
 #include <c_msg.h>
 
 /*
+ * Service Primitives (SPI).
+ */
+
+#define C_MSG_ACK 	0x00000010
+#define C_MSG_NAK 	0x00000020
+#define C_MSG_REJ 	0x00000030
+
+typedef ssize_t 	(*c_msg_fn_t)(int, struct msghdr *, int);
+
+/*
  * Message primitive (MPI) encapsulates message token.
  */
  
@@ -45,16 +55,6 @@ struct c_msg {
 };
 #define C_MSG_LEN 	(sizeof(struct c_msg))
 #define C_MSG_QLEN 	13
-
-/*
- * Service Primitives (SPI).
- */
-
-#define C_MSG_ACK 	0x00000010
-#define C_MSG_NAK 	0x00000020
-#define C_MSG_REJ 	0x00000030
-
-typedef ssize_t 	(*c_msg_fn_t)(int, struct msghdr *, int);
 
 _BEGIN_DECLS
 struct c_msg * 	c_msg_alloc(size_t);
