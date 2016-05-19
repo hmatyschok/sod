@@ -47,9 +47,9 @@ typedef ssize_t 	(*c_msg_fn_t)(int, struct msghdr *, int);
  */
  
 struct c_msg {
-	struct c_obj 	msg_obj;
-#define msg_id 		msg_obj.c_id
-#define msg_size 	msg_obj.c_size	
+	struct c_obj 	msg_obj;	
+#define msg_id 	msg_obj.c_id
+#define msg_size 	msg_obj.c_size
 	int 	msg_code; 	/* encodes request or response */
 	char 	msg_tok[C_NMAX + 1];
 };

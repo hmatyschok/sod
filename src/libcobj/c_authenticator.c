@@ -129,11 +129,11 @@ c_authenticator_class_init(void)
 	if ((cm = c_base_class_init()) == NULL)
 		return (NULL);
 	
-	if ((cm = (*cm->cm_class_init)(this)) == NULL)
+	if ((cm = (*cm->cm_init)(this)) == NULL)
 		return (NULL);
 
-	cm->cm_obj_start = ca_start;
-	cm->cm_obj_start = ca_stop;
+	cm->cm_obj_start = c_authenticate_start;
+	cm->cm_obj_start = c_authenticate_stop;
 	
 	return (this->c_methods);	
 }
@@ -143,7 +143,7 @@ c_authenticator_class_init(void)
  */
 
 int  
-c_authenticator_class_free(void)
+c_authenticator_class_fini(void)
 {
 	struct *c_class *this;
 	struct c_methods *cm;
@@ -151,7 +151,7 @@ c_authenticator_class_free(void)
 	this = &c_authenticator_class;
 	cm = &this->c_base;
 	
-	return ((*cm->cm_class_free)(this));	
+	return ((*cm->cm_destroy)(this));	
 }
 
 /******************************************************************************
@@ -173,7 +173,7 @@ c_authenticator_create(int srv, int rmt)
 	this = &c_authenticator_class;
 	cm = &this->c_base;
 	
-	if ((sc = (*cm->cm_obj_create)(this)) != NULL) {
+	if ((sc = (*cm->cm_create)(this)) != NULL) {
 		sc->sc_sock_rmt = rmt;
 		sc->sc_sock_cli = cli;
 	
@@ -197,15 +197,13 @@ c_authenticator_create(int srv, int rmt)
 static int 
 c_authenticator_destroy(struct c_thr *thr) 
 {
-	struct c_class *this = &c_authenticator_class;
-	struct c_methods *base = &this->c_base;
+	struct c_class *this;
+	struct c_methods *base;
 	
 	this = &c_authenticator_class;
 	cm = &this->c_base;
 	
-	...
-	
-	return (0);
+	return ((*cm->cm_destroy)(thr));
 }
 
 /******************************************************************************
@@ -315,7 +313,7 @@ syslog(LOG_ERR, "%s: rx: %s\n", __func__, sc->sc_buf->msg_tok);
 static void *
 c_authenticator_start(void *arg)
 {
-	ca_state_fn_t ca_state = NULL;
+	ca_state_t fn = NULL;
 	struct ca_softc *sc;
 	
 	if ((sc = arg) == NULL)
@@ -476,7 +474,7 @@ syslog(LOG_ERR, "%s\n", __func__);
 /*
  * Create response.
  */			
-	resp = SOD_AUTH_REJ;	
+	resp = C_AUTHENTICATOR_AUTH_REJ;	
 	
 	if (ap->ap_rv == PAM_SUCCESS) 
 		resp = SOD_AUTH_ACK;

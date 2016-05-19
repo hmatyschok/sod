@@ -34,27 +34,27 @@
 
 struct c_obj;
 
-typedef void * 	(*c_class_init_t)(void *);
-typedef int 	(*c_class_free_t)(void *);
+typedef void * 	(*c_init_t)(void *);
+typedef int 	(*c_fini_t)(void *);
 
-typedef void *	(*c_obj_create_t)(void *);
-typedef void *	(*c_obj_start_t)(void *);
-typedef void 	(*c_obj_stop_t)(void *);
-typedef int 	(*c_obj_destroy_t)(void *, void *);
+typedef void *	(*c_create_t)(void *);
+typedef void *	(*c_start_t)(void *);
+typedef void 	(*c_stop_t)(void *);
+typedef int 	(*c_destroy_t)(void *, void *);
 
 /*
  * Implements generic interface. 
  */
 struct c_methods {
-	c_class_init_t 		cm_class_init;
-	c_class_free_t 		cm_class_free;
+	c_init_t 		cm_init;
+	c_fini_t 		cm_free;
 /*
  * Methods implemets life-cycle of an instance.  
  */	
-	c_obj_create_t 		cm_obj_create;
-	c_obj_start_t 		cm_obj_start;
-	c_obj_stop_t 		cm_obj_stop;
-	c_obj_free_t 		cm_obj_free;
+	c_create_t 		cm_create;
+	c_start_t 		cm_start;
+	c_stop_t 		cm_stop;
+	c_destroy_t 		cm_destroy;
 };
 
 /*
@@ -63,10 +63,10 @@ struct c_methods {
  * c_id = $( date -u '+%s' )
  */
 struct c_obj {
-	long 	c_id; 	/* identifier */
-	size_t 	c_size;
+	long 	co_id; 	/* identifier */
+	size_t 	co_size;
 	
-	TAILQ_NEXT(c_obj) c_next;
+	TAILQ_NEXT(c_obj) co_next;
 };
 TAILQ_HEAD(c_obj_hd, c_obj);
 
@@ -82,20 +82,25 @@ struct c_cache {
  * By pthread(3) covered instance.
  */
 struct c_thr {
-	struct c_obj 	c_obj;
+	struct c_obj 	ct_co;
+#define ct_id 	ct_co.co_id
+#define ct_size 	ct_co.co_size
 /*
  * Attcibutes, pthread(3).
  */	
-	pthread_cond_t 	c_cv;
-	pthread_mutex_t 	c_mtx;
-	pthread_t 	c_tid;
+	pthread_cond_t 	ct_cv;
+	pthread_mutex_t 	ct_mtx;
+	pthread_t 	ct_tid;
 };
+
 
 /*
  * Implements class.
  */
 struct c_class {
-	struct c_obj 		c_obj;
+	struct c_obj 		c_co;
+#define c_id 	c_co.co_id
+#define c_size 	c_co.co_size
 	struct c_cache 		c_children;
 	struct c_cache 		c_instances;
 /*
@@ -110,6 +115,6 @@ struct c_class {
 
 __BEGIN_DECLS
 void * 	c_base_class_init(void);
-int 	c_base_class_free(void);
+int 	c_base_class_fini(void);
 __END_DECLS
 

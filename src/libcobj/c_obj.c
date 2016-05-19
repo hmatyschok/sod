@@ -58,12 +58,12 @@ static int 	c_class_cache_opt(c_cache_fn_t, struct c_cache *,
 	struct c_class *);
 
 static void *	c_class_init(void *);
-static int 	c_class_free(void *);
+static int 	c_class_fini(void *);
 static void * 	c_thr_create(void *);
 static void * 	c_thr_destroy(void *);
 
 static void * 	c_nop_init(void *);
-static int 	c_nop_free(void *);
+static int 	c_nop_fini(void *);
 static void * 	c_nop_create(void *);
 static void * 	c_nop_start(void *);
 static int 	c_nop_stop(void *);
@@ -77,12 +77,12 @@ static int 	c_nop_destroy(void *);
  * Interface implements null-operations.
  */ 
 static struct c_methods c_nop = {
-	.cm_class_init 		= c_nop_init,
-	.cm_class_free 		= c_nop_free,
-	.cm_obj_create 		= c_nop_create,
-	.cm_obj_start 		= c_nop_start,
-	.cm_obj_stop 		= c_nop_stop,
-	.cm_obj_free 		= c_nop_destroy,
+	.cm_init 		= c_nop_init,
+	.cm_fini 		= c_nop_fini,
+	.cm_create 		= c_nop_create,
+	.cm_start 		= c_nop_start,
+	.cm_stop 		= c_nop_stop,
+	.cm_destroy 		= c_nop_destroy,
 }; 
 
 /*
@@ -100,12 +100,12 @@ static struct c_class c_base_class = {
 		.c_size 		= C_BASE_CLASS_SIZE,
 	},
 	.c_base = {
-		.cm_class_init 		= c_class_init,
-		.cm_class_free 		= c_class_free,
-		.cm_obj_create 		= c_thr_create,
-		.cm_obj_start 		= c_nop_start,
-		.cm_obj_stop 		= c_nop_stop,
-		.cm_obj_free 		= c_thr_destroy,
+		.cm_init 		= c_class_init,
+		.cm_fini 		= c_class_fini,
+		.cm_create 		= c_thr_create,
+		.cm_start 		= c_nop_start,
+		.cm_stop 		= c_nop_stop,
+		.cm_destroy 		= c_thr_destroy,
 	},
 	.c_methods 		= &c_nop,
 };
@@ -122,10 +122,10 @@ c_base_class_init(void)
 }
 
 int 
-c_base_class_free(void)
+c_base_class_fini(void)
 {
 
-	return (c_class_free(&c_base_class));	
+	return (c_class_fini(&c_base_class));	
 }
 
 /******************************************************************************
@@ -144,11 +144,11 @@ c_class_init(void *arg)
 	if ((cls = arg) == NULL) 
 		return (NULL);
 		
-	if (c_cache_init(cls->c_children))
+	if (c_cache_init(&cls->c_children))
 		return (NULL);
 
-	if (c_cache_init(cls->c_instances)) {
-		c_cache_free(cls->c_children);
+	if (c_cache_init(&cls->c_instances)) {
+		c_cache_free(&cls->c_children);
 		return (NULL);
 	}
 	
@@ -162,17 +162,17 @@ c_class_init(void *arg)
 }
 
 static int 
-c_class_free(void *arg)
+c_class_fini(void *arg)
 {
 	struct c_class *cls;
 	
 	if ((cls = arg) == NULL) 
 		return (-1);
 	
-	if (c_cache_free(cls->c_children))
+	if (c_cache_free(&cls->c_children))
 		return (-1);
 		
-	if (c_cache_free(cls->c_instances))
+	if (c_cache_free(&cls->c_instances))
 		return (-1);
 
 	if (cls != &c_base_class) {
@@ -215,34 +215,34 @@ c_thr_create(void *arg)
 /*
  * An abstract component cannot instantiate itself.
  */
-	if (cls->c_obj.c_id == c_base_class.c_obj.c_id)
+	if (cls->c_id == c_base_class.c_id)
 		goto out;
 /*
  * Allocate.
  */
-	if ((thr = calloc(1, cls->c_obj.c_size)) == NULL)
+	if ((thr = calloc(1, cls->c_size)) == NULL)
 		goto out;
 /*
  * On success, initialize generic properties.
  */	
-	if (pthread_cond_init(&thr->c_cv, NULL))
+	if (pthread_cond_init(&thr->ct_cv, NULL))
 		goto bad;
 	
-	if (pthread_mutex_init(&thr->c_mtx, NULL))
+	if (pthread_mutex_init(&thr->ct_mtx, NULL))
 		goto bad1;
 /*
  * If successfull, then create running pthread(3) instance.
  */	
-	if (pthread_create(&thr->c_tid, NULL, cls->c_base->c_start, thr) != 0) 
+	if (pthread_create(&thr->ct_tid, NULL, cls->c_base->cm_start, thr) != 0) 
 		goto bad2;
 
-	bcopy(thr->c_tid, &thr->c_obj.c_id, sizeof(thr->c_obj.c_id));
+	(void)memcpy(&thr->ct_id, thr->ct_tid, sizeof(thr->ct_id));
 	
-	key.data = &thr->c_obj.c_id;
-	key.size = sizeof(thr->c_obj.c_id);
+	key.data = &thr->ct_id;
+	key.size = sizeof(thr->ct_id);
 	
-	thr->c_obj.c_size = cls->c_obj.c_size;
-	data.size = thr->c_obj.c_size;
+	thr->ct_size = cls->c_size;
+	data.size = thr->ct_size;
 	data.data = thr;
 	
 	if (c_cache_add(&cls->c_instances, &key, &data))
@@ -250,11 +250,11 @@ c_thr_create(void *arg)
 out:		
 	return (thr);
 bad3:
-	pthread_cancel(&thr->c_tid);
+	(void)pthread_cancel(thr->ct_tid);
 bad2:	
-	pthread_mtx_destroy(&thr->c_cv);
+	(void)pthread_mutex_destroy(&thr->ct_mtx);
 bad1:
-	pthread_cond_destroy(&thr->c_cv;
+	(void)pthread_cond_destroy(&thr->ct_cv;
 bad:
 	free(thr);
 	thr = NULL;
@@ -287,27 +287,29 @@ c_thr_destroy(void *arg0, void *arg1)
 /*
  * An abstract component cannot be destroyed.
  */
-	if (cls->c_obj.c_id == c_base_class.c_obj.c_id)
+	if (cls->c_id == c_base_class.c_id)
 		goto out;
 /*
  * Release pthread(3). This operation can't fail because
  * returned ESRCH means that there was no pthread(3). 
  */	
-	(void)pthread_cancel(thr->c_tid);
-	(void)pthread_cond_destroy(&thr->c_cv);
-	(void)pthread_mutex_destroy(&thr->c_mtx);
+	(void)pthread_cancel(thr->ct_tid);
+	(void)pthread_cond_destroy(&thr->ct_cv);
+	(void)pthread_mutex_destroy(&thr->ct_mtx);
 /*
  * Release object from database.
  */	
-	key.data = &thr->c_obj.c_id;
-	key.size = sizeof(thr->c_obj.c_id);
+	key.data = &thr->ct_id;
+	key.size = sizeof(thr->ct_id);
 	
 	(void)memset(&data, 0, sizeof(data));
 	
 	rv = c_cache_del(&cls->c_instances, &key, &data);
 	
-	if (rv == 0) 
+	if (rv == 0) {
+		rv = (*cls->c_base->cm_stop)(data.data);
 		free(data.data);
+	}
 out:		
 	return (rv);
 }
@@ -329,7 +331,7 @@ c_nop_init(void *arg)
 }
 
 static int 
-c_nop_free(void *arg)
+c_nop_fini(void *arg)
 {
 
 	return (0);	
