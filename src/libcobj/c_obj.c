@@ -54,7 +54,7 @@ static int 	c_cache_get(struct c_cache *, DBT *, DBT *);
 static int 	c_cache_del(struct c_cache *, DBT *, DBT *);
 static int 	c_cache_free(struct c_cache *);
 
-static int 	c_class_cache_opt(c_cache_fn_t, struct c_cache *, 
+static int 	c_cache_fn(c_cache_fn_t, struct c_cache *, 
 	struct c_class *);
 
 static void *	c_class_init(void *);
@@ -107,7 +107,7 @@ static struct c_class c_base_class = {
 		.cm_stop 		= c_nop_stop,
 		.cm_destroy 		= c_thr_destroy,
 	},
-	.c_methods 		= &c_nop,
+	.c_public 		= &c_nop,
 };
 
 
@@ -153,7 +153,7 @@ c_class_init(void *arg)
 	}
 	
 	if (cls != &c_base_class) {
-		if (c_cache_op(c_cache_add, &c_base_class.c_children, cls))
+		if (c_cache_fn(c_cache_add, &c_base_class.c_children, cls))
 			return (NULL);
 		
 		cls->c_base = c_base_class.c_base;
@@ -176,7 +176,7 @@ c_class_fini(void *arg)
 		return (-1);
 
 	if (cls != &c_base_class) {
-		if (c_cache_op(c_cache_del, &c_base_class.c_children, cls))
+		if (c_cache_fn(c_cache_del, &c_base_class.c_children, cls))
 			return (-1);
 		
 		cls->c_base = c_nop;
@@ -462,7 +462,7 @@ c_cache_free(struct c_cache *ch)
 }
 
 static int
-c_class_cache_opt(c_cache_fn_t fn, struct c_cache *ch, struct c_class *cls)
+c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, struct c_class *cls)
 {
 	DBT key;
 	DBT data;

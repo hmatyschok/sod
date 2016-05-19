@@ -30,9 +30,10 @@
 #include <pthread.h>
 #include <unistd.h>
 
-#define C_NMAX 	127
 
 struct c_obj;
+
+#define C_NMAX 	127
 
 typedef void * 	(*c_init_t)(void *);
 typedef int 	(*c_fini_t)(void *);
@@ -43,24 +44,12 @@ typedef void 	(*c_stop_t)(void *);
 typedef int 	(*c_destroy_t)(void *, void *);
 
 /*
- * Implements generic interface. 
- */
-struct c_methods {
-	c_init_t 		cm_init;
-	c_fini_t 		cm_free;
-/*
- * Methods implemets life-cycle of an instance.  
- */	
-	c_create_t 		cm_create;
-	c_start_t 		cm_start;
-	c_stop_t 		cm_stop;
-	c_destroy_t 		cm_destroy;
-};
-
-/*
- * Implements generic object.
+ * Implements interface control information 
+ * for an object still implements a class,
+ * by pthread(3) covered runtime instances
+ * or enqueueable message primitve.
  *
- * c_id = $( date -u '+%s' )
+ *  c_id := $( date -u '+%s' )
  */
 struct c_obj {
 	long 	co_id; 	/* identifier */
@@ -71,7 +60,8 @@ struct c_obj {
 TAILQ_HEAD(c_obj_hd, c_obj);
 
 /*
- * Implements generic cache. 
+ * Implements generic cache
+ * based on db(3) API. 
  */
 struct c_cache {
 	struct c_obj_hd 	ch_hd;
@@ -79,20 +69,24 @@ struct c_cache {
 };
 
 /*
- * By pthread(3) covered instance.
+ * Implements generic interface. 
  */
-struct c_thr {
-	struct c_obj 	ct_co;
-#define ct_id 	ct_co.co_id
-#define ct_size 	ct_co.co_size
+struct c_methods {
+	struct c_obj 		cm_co;
+#define cm_id 	cm_co.co_id
+#define cm_size 	cm_co.co_size
+	c_init_t 		cm_init;
+	c_fini_t 		cm_free;
 /*
- * Attcibutes, pthread(3).
+ * Methods implemets life-cycle of an instance.  
  */	
-	pthread_cond_t 	ct_cv;
-	pthread_mutex_t 	ct_mtx;
-	pthread_t 	ct_tid;
+	c_create_t 		cm_create;
+	c_start_t 		cm_start;
+	c_stop_t 		cm_stop;
+	c_destroy_t 		cm_destroy;
 };
-
+#define C_METHODS 	1463676933
+#define C_METHODS_SIZE 	(sizeof(struct c_methods))
 
 /*
  * Implements class.
@@ -110,7 +104,25 @@ struct c_class {
 /*
  * Public interface.
  */
-	void 	*c_methods;
+	void 	*c_public;
+};
+#define C_BASE_CLASS 	1463676824
+#define C_BASE_SIZE 	(sizeof(structc_class))
+
+
+/*
+ * By pthread(3) covered instance.
+ */
+struct c_thr {
+	struct c_obj 	ct_co;
+#define ct_id 	ct_co.co_id
+#define ct_size 	ct_co.co_size
+/*
+ * Attcibutes, pthread(3).
+ */	
+	pthread_cond_t 	ct_cv;
+	pthread_mutex_t 	ct_mtx;
+	pthread_t 	ct_tid;
 };
 
 __BEGIN_DECLS

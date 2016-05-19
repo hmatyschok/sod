@@ -49,6 +49,7 @@ c_msg_alloc(size_t n)
 	
 	if (n <= C_MSG_QLEN) {
 		msg = calloc(n, C_MSG_LEN);
+		msg->msg_id = C_MSG;
 		msg->msg_size = C_MSG_LEN;
 	}
 	return (msg);

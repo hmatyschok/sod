@@ -53,6 +53,7 @@ struct c_msg {
 	int 	msg_code; 	/* encodes request or response */
 	char 	msg_tok[C_NMAX + 1];
 };
+#define C_MSG 	1463677004
 #define C_MSG_LEN 	(sizeof(struct c_msg))
 #define C_MSG_QLEN 	13
 

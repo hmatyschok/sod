@@ -104,7 +104,7 @@ static struct c_class c_authenticator_class = {
 		.c_id 		= C_AUTHENTICATOR_CLASS,
 		.c_size 		= C_AUTHENTICATOR_SIZE,
 	},
-	.c_methods 		= &c_authenticator_methods,
+	.c_public 		= &c_authenticator_methods,
 };
 
 static const char 	*ca_default_prompt = C_AUTHENTICATOR_PROMPT_DFLT;
@@ -133,9 +133,9 @@ c_authenticator_class_init(void)
 		return (NULL);
 
 	cm->cm_obj_start = c_authenticate_start;
-	cm->cm_obj_start = c_authenticate_stop;
+	cm->cm_obj_stop = c_authenticate_stop;
 	
-	return (this->c_methods);	
+	return (this->c_public);	
 }
 
 /*
@@ -319,7 +319,7 @@ c_authenticator_start(void *arg)
 	if ((sc = arg) == NULL)
 		goto out;
 	
-	pthread_mutex_lock(&sc->c_thr.c_mtx);
+	(void)pthread_mutex_lock(&sc->c_thr.c_mtx);
 	
 	if (pthread_cond_wait(&sc->c_thr.c_cv, &sc->c_thr.c_mtx) == 0)
 		ca_state = (ca_state_fn_t)ap_establish;	
@@ -327,7 +327,7 @@ c_authenticator_start(void *arg)
 	while (fn != NULL)
 		fn = (ca_state_t)(*fn)(sc);
 		
-	pthread_mutex_unlock(&sc->c_thr.c_mtx);
+	(void)pthread_mutex_unlock(&sc->c_thr.c_mtx);
 out:	
 	return (arg);
 }	
