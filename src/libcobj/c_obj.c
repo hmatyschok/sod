@@ -49,9 +49,9 @@
 typedef int  	(*c_cache_fn_t)(struct c_cache *, DBT *, DBT *);
 
 static int 	c_cache_init(struct c_cache *);
-static int 	c_cache_add(struct c_cache *, DBT *, DBT *);
-static int 	c_cache_get(struct c_cache *, DBT *, DBT *);
-static int 	c_cache_del(struct c_cache *, DBT *, DBT *);
+static void *   c_cache_add(struct c_cache *, DBT *, void *);
+static void *   c_cache_get(struct c_cache *, DBT *, void *);
+static void *   c_cache_del(struct c_cache *, DBT *, void *);
 static int 	c_cache_free(struct c_cache *);
 
 static int 	c_cache_fn(c_cache_fn_t, struct c_cache *, void *);
@@ -159,9 +159,10 @@ c_class_init(void *arg)
 	}
 	
 	if (cls != &c_base_class) {
-		if (c_cache_fn(c_cache_add, &c_base_class.c_children, cls))
+		if (c_cache_fn(c_cache_add, 
+		    &c_base_class.c_children, cls) == NULL) {
 			return (NULL);
-		
+		}
 		cls->c_base = c_base_class.c_base;
 	}
 	return (&cls->c_base);	
@@ -182,9 +183,10 @@ c_class_fini(void *arg)
 		return (-1);
 
 	if (cls != &c_base_class) {
-		if (c_cache_fn(c_cache_del, &c_base_class.c_children, cls))
+		if (c_cache_fn(c_cache_del, 
+		    &c_base_class.c_children, cls) == NULL) {
 			return (-1);
-		
+		}
 		cls->c_base = c_nop;
 	}
 	return (0);	
@@ -210,9 +212,6 @@ c_thr_create(void *arg)
 {
 	struct c_thr *thr = NULL;
 	struct c_class *cls;
-	
-	DBT key;
-	DBT data;	
 /*
  * Apply various condition tests.
  */	
@@ -244,14 +243,9 @@ c_thr_create(void *arg)
 
 	(void)memcpy(&thr->ct_id, thr->ct_tid, sizeof(thr->ct_id));
 	
-	key.data = &thr->ct_id;
-	key.size = sizeof(thr->ct_id);
-	
 	thr->ct_len = cls->c_len;
-	data.size = thr->ct_len;
-	data.data = thr;
 	
-	if (c_cache_add(&cls->c_instances, &key, &data))
+	if (c_cache_fn(c_cache_add, &cls->c_instances, thr) == NULL)
 		goto bad3;
 out:		
 	return (thr);
@@ -279,9 +273,6 @@ c_thr_destroy(void *arg0, void *arg1)
 	
 	struct c_class *cls;
 	struct c_thr *thr;
-	
-	DBT key;
-	DBT data;
 
 	if ((thr = arg1) == NULL)	
 		goto out;
@@ -305,16 +296,10 @@ c_thr_destroy(void *arg0, void *arg1)
 /*
  * Release object from database.
  */	
-	key.data = &thr->ct_id;
-	key.size = sizeof(thr->ct_id);
-	
-	(void)memset(&data, 0, sizeof(data));
-	
-	eval = c_cache_del(&cls->c_instances, &key, &data);
-	
-	if (eval == 0) {
-		eval = (*cls->c_base->cm_stop)(data.data);
-		free(data.data);
+	thr = c_cache_fn(c_cache_del, &cls->c_instances, thr);
+	if (thr) {
+		eval = (*cls->c_base->cm_stop)(thr);
+		free(thr);    
 	}
 out:		
 	return (eval);
@@ -404,48 +389,66 @@ c_cache_init(struct c_cache *ch)
 /*
  * Insert object.
  */
-static int 	
-c_cache_add(struct c_cache *ch, DBT *key, DBT *data)
+static void *
+c_cache_add(struct c_cache *ch, DBT *key, void *arg)
 {	
-	if ((*ch->ch_db->put)(ch->ch_db, key, data, 0))
-		return (-1);
+	struct c_obj *co;
+	DBT data;
+	
+	if ((co = arg) == NULL)
+	    return (NULL);
+
+	data.data = co;
+	data.size = co->co_len);
+	
+	if ((*ch->ch_db->put)(ch->ch_db, key, &data, 0))
+		return (NULL);
 	
 	TAILQ_INSERT_TAIL(&ch->ch_hd, data.data, c_next);
 	
-	return (0);
+	return (data.data);
 }
 
 /*
- * Find requested objext.
+ * Find requested object.
  */
-static int 	
-c_cache_get(struct c_cache *ch, DBT *key, DBT *data)
+static void * 	
+c_cache_get(struct c_cache *ch, DBT *key, void *arg __unused)
 {	
+    DBT data;
 
-	return ((*ch->ch_db->get)(ch->ch_db, key, data, 0));
+    (void)memset(&data, 0, sizeof(data));
+
+    if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
+        return (NULL);
+	
+	return (data.data);
 }
 
 /*
  * Fetch requested object.
  */
-static int 	
-c_cache_del(struct c_cache *ch, DBT *key, DBT *data)
+static void * 	
+c_cache_del(struct c_cache *ch, DBT *key, void *arg __unused)
 {
-	if ((*ch->ch_db->get)(ch->ch_db, key, data, 0))
-		return (-1);
+	DBT data;
+	
+	(void)memset(&data, 0, sizeof(data));
+	
+	if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
+		return (NULL);
 	
 	if ((*ch->ch_db->del)(ch->ch_db, key, 0))
-		return (-1);
+		return (NULL);
 		
 	TAILQ_REMOVE(&ch->ch_hd, data.data, c_next);
 		
-	return (0);
+	return (data.data);
 }
 
 /*
  * Release by in-memory db(3) bound ressources,
- * if and only if all objects were released 
- * previously.
+ * if all objects were released previously.
  */
 static int
 c_cache_free(struct c_cache *ch)
@@ -467,10 +470,10 @@ c_cache_free(struct c_cache *ch)
 	return (0);
 }
 
-static int
+static void *
 c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
 {
-	struct c_obj *co
+	struct c_obj *co;
 	
 	DBT key;
 	DBT data;
@@ -481,8 +484,5 @@ c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
 	key.data = &co->co_id;
 	key.size = sizeof(co->co_id);
 	
-	data.data = co;
-	data.size = co->co_len);
-	
-	return ((*fn)(ch, &key, &data));
+	return ((*fn)(ch, &key, arg));
 }
