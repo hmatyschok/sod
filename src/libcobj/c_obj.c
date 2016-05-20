@@ -54,8 +54,7 @@ static int 	c_cache_get(struct c_cache *, DBT *, DBT *);
 static int 	c_cache_del(struct c_cache *, DBT *, DBT *);
 static int 	c_cache_free(struct c_cache *);
 
-static int 	c_cache_fn(c_cache_fn_t, struct c_cache *, 
-	struct c_class *);
+static int 	c_cache_fn(c_cache_fn_t, struct c_cache *, void *);
 
 static void *	c_class_init(void *);
 static int 	c_class_fini(void *);
@@ -380,7 +379,7 @@ c_nop_destroy(void *arg0, void *arg1)
  ******************************************************************************/
 
 /*
- * Create in-memory hash table based on db(3) 
+ * Create in-memory hash table based db(3) 
  * and initialize corrosponding tail queue.
  */
 
@@ -403,7 +402,7 @@ c_cache_init(struct c_cache *ch)
 
 
 /*
- * Insert item.
+ * Insert object.
  */
 static int 	
 c_cache_add(struct c_cache *ch, DBT *key, DBT *data)
@@ -417,7 +416,7 @@ c_cache_add(struct c_cache *ch, DBT *key, DBT *data)
 }
 
 /*
- * Find requested item.
+ * Find requested objext.
  */
 static int 	
 c_cache_get(struct c_cache *ch, DBT *key, DBT *data)
@@ -427,7 +426,7 @@ c_cache_get(struct c_cache *ch, DBT *key, DBT *data)
 }
 
 /*
- * Fetch requested item.
+ * Fetch requested object.
  */
 static int 	
 c_cache_del(struct c_cache *ch, DBT *key, DBT *data)
@@ -444,9 +443,9 @@ c_cache_del(struct c_cache *ch, DBT *key, DBT *data)
 }
 
 /*
- * Release by hash table bound ressources,
- * if and only if all by table stored items
- * were released previously.
+ * Release by in-memory db(3) bound ressources,
+ * if and only if all objects were released 
+ * previously.
  */
 static int
 c_cache_free(struct c_cache *ch)
@@ -469,16 +468,21 @@ c_cache_free(struct c_cache *ch)
 }
 
 static int
-c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, struct c_class *cls)
+c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
 {
+	struct c_obj *co
+	
 	DBT key;
 	DBT data;
 	
-	key.data = &cls->c_id;
-	key.size = sizeof(cls->c_id);
+	if ((co = arg) == NULL)
+	    return (-1);
 	
-	data.data = cls;
-	data.size = sizeof(*cls);
+	key.data = &co->co_id;
+	key.size = sizeof(co->co_id);
+	
+	data.data = co;
+	data.size = co->co_len);
 	
 	return ((*fn)(ch, &key, &data));
 }
