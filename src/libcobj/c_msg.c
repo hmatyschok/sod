@@ -93,7 +93,7 @@ c_msg_recv(int s, struct msghdr *mh, int flags)
  * Performs MPI exchange via callback.  
  */
 int
-c_msg_handle(c_msg_fn_t c_msg_fn, int s, struct c_msg *msg)
+c_msg_fn(c_msg_fn_t fn, int s, struct c_msg *msg)
 {
 	struct iovec vec;
 	struct msghdr mh;
@@ -108,7 +108,7 @@ c_msg_handle(c_msg_fn_t c_msg_fn, int s, struct c_msg *msg)
 	if ((len = msg->msg_len) != C_MSG_LEN)
 		goto out;
 
-	if (c_msg_fn == c_msg_recv || c_msg_fn == c_msg_send) {
+	if (fn == c_msg_recv || fn == c_msg_send) {
 		vec.iov_base = msg;
 		vec.iov_len = msg->msg_len;
 	
@@ -117,7 +117,7 @@ c_msg_handle(c_msg_fn_t c_msg_fn, int s, struct c_msg *msg)
 		msg.msg_iov = &vec;
 		msg.msg_iovlen = 1;			
 		
-		if ((*c_msg_fn)(s, &mh, 0) == msg->msg_len)
+		if ((*fn)(s, &mh, 0) == msg->msg_len)
 			eval = 0;	
 	}
 out:

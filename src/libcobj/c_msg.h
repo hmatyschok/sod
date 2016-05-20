@@ -62,6 +62,6 @@ struct c_msg * 	c_msg_alloc(void);
 void 	c_msg_prepare(const char *, uint32_t, long, struct c_msg *);
 ssize_t 	c_msg_send(int, struct msghdr *, int);
 ssize_t 	c_msg_recv(int, struct msghdr *, int);
-int 	c_msg_handle(c_msg_t, int, struct c_msg *);
+int 	c_msg_fn(c_msg_t, int, struct c_msg *);
 void 	c_msg_free(struct c_msg *);
 __END_DECLS

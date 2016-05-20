@@ -259,12 +259,12 @@ c_authenticator_conv(int num_msg, const struct pam_message **msg,
 /*
  * Request PAM_AUTHTOK.
  */				
-		if (c_msg_handle(c_msg_send, sc->sc_sock_rmt, &sc->sc_buf) < 0)
+		if (c_msg_fn(c_msg_send, sc->sc_sock_rmt, &sc->sc_buf) < 0)
 			break;
 /*
  * Await response from applicant.
  */	
-		if (c_msg_handle(c_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0)
+		if (c_msg_fn(c_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0)
 			break;
 	
 		if (sc->sc_buf->msg_id != sc->sc_id)	
@@ -352,7 +352,7 @@ c_authenticator_establish(void *arg)
 syslog(LOG_ERR, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */	
 	
-	if (c_msg_handle(c_msg_recv, sc->sc_sock_rmt, sc->sc_buf) < 0) 
+	if (c_msg_fn(c_msg_recv, sc->sc_sock_rmt, sc->sc_buf) < 0) 
 		goto out;
 /*
  * An running instance cannot send messages to itself.
@@ -505,7 +505,7 @@ c_authenticator_response(void *arg)
 syslog(LOG_ERR, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */
 
-	if (c_msg_handle(c_msg_send, sc->sc_sock_rmt, sc->sc_buf) < 0)
+	if (c_msg_fn(c_msg_send, sc->sc_sock_rmt, sc->sc_buf) < 0)
 		(*ap->ap_thr.cobj_exit)(EX_OSERR, __func__, sc);
 out:	
 	return (ca_state);
