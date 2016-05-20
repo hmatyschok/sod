@@ -118,7 +118,6 @@ static struct c_class c_base_class = {
 	.c_public 		= &c_nop,
 };
 
-
 /******************************************************************************
  * Public Class-methods.
  ******************************************************************************/
@@ -277,7 +276,7 @@ bad:
 static int
 c_thr_destroy(void *arg0, void *arg1)
 {
-	int rv = -1;
+	int eval = -1;
 	
 	struct c_class *cls;
 	struct c_thr *thr;
@@ -312,14 +311,14 @@ c_thr_destroy(void *arg0, void *arg1)
 	
 	(void)memset(&data, 0, sizeof(data));
 	
-	rv = c_cache_del(&cls->c_instances, &key, &data);
+	eval = c_cache_del(&cls->c_instances, &key, &data);
 	
-	if (rv == 0) {
-		rv = (*cls->c_base->cm_stop)(data.data);
+	if (eval == 0) {
+		eval = (*cls->c_base->cm_stop)(data.data);
 		free(data.data);
 	}
 out:		
-	return (rv);
+	return (eval);
 }
 
 

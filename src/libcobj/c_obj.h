@@ -44,12 +44,12 @@ typedef void 	(*c_stop_t)(void *);
 typedef int 	(*c_destroy_t)(void *, void *);
 
 /*
- * Implements interface control information 
- * for an object still implements a class,
- * by pthread(3) covered runtime instances
- * or enqueueable message primitve.
+ * Implements interface control information for an 
+ * object still implements classes, by pthread(3) 
+ * covered runtime instances, interfaces or message 
+ * primitves.
  *
- *  c_id := $( date -u '+%s' )
+ *  co_id := $( date -u '+%s' )
  */
 struct c_obj {
 	long 	co_id; 	/* identifier */

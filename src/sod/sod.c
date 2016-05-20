@@ -117,7 +117,7 @@ sod_sigaction(void *arg)
 		case SIGINT:
 		case SIGKILL:	
 		case SIGTERM:
-			exit(0);
+			exit(EX_OK);
 			break;
 		default:	
 			break;

@@ -420,41 +420,41 @@ syslog(LOG_ERR, "%s\n", __func__);
  * Verify if user has UID 0.
  */
 		if (ap->sc_pwd->pw_uid == (uid_t)0) 
-			ap->ap_rv = PAM_PERM_DENIED;
+			ap->ap_eval = PAM_PERM_DENIED;
 		else
-			ap->ap_rv = PAM_SUCCESS;
+			ap->ap_eval = PAM_SUCCESS;
 	} else 
-		ap->ap_rv = PAM_USER_UNKNOWN;
+		ap->ap_eval = PAM_USER_UNKNOWN;
 	
 	endpwent();
 	
-	if (ap->ap_rv == PAM_SUCCESS)
+	if (ap->ap_eval == PAM_SUCCESS)
 		ask = 1;
 	
 	while (ask != 0) {
 /*
  * Service name for pam(8) is defined implecitely.
  */		
-		ap->ap_rv = pam_start(__func__, ap->sc_uname, 
+		ap->ap_eval = pam_start(__func__, ap->sc_uname, 
 			&ap->sc_pamc, &ap->sc_pamh);
 
-		if (ap->ap_rv == PAM_SUCCESS) {
-			ap->ap_rv = pam_set_item(ap->sc_pamh, PAM_RUSER, 
+		if (ap->ap_eval == PAM_SUCCESS) {
+			ap->ap_eval = pam_set_item(ap->sc_pamh, PAM_RUSER, 
 				ap->sc_uname);
 		}
 	
-		if (ap->ap_rv == PAM_SUCCESS) {
-			ap->ap_rv = pam_set_item(ap->sc_pamh, PAM_RHOST, 
+		if (ap->ap_eval == PAM_SUCCESS) {
+			ap->ap_eval = pam_set_item(ap->sc_pamh, PAM_RHOST, 
 				ap->sc_hname);
 		}
 	
-		if (ap->ap_rv == PAM_SUCCESS) {
-			ap->ap_rv = pam_authenticate(ap->sc_pamh, 0);
+		if (ap->ap_eval == PAM_SUCCESS) {
+			ap->ap_eval = pam_authenticate(ap->sc_pamh, 0);
 /*
  * Authenticate.
  */
 			
-			if (ap->ap_rv == PAM_AUTH_ERR) {				
+			if (ap->ap_eval == PAM_AUTH_ERR) {				
 /*
  * Reenter loop, if PAM_AUTH_ERR condition halts. 
  */
@@ -467,7 +467,7 @@ syslog(LOG_ERR, "%s\n", __func__);
 				if (cnt >= retries)
 					ask = 0;		
 	
-				(void)pam_end(ap->sc_pamh, ap->ap_rv);
+				(void)pam_end(ap->sc_pamh, ap->ap_eval);
 		
 				ap->sc_pamh = NULL;
 			} else
@@ -480,7 +480,7 @@ syslog(LOG_ERR, "%s\n", __func__);
  */			
 	resp = C_AUTHENTICATOR_AUTH_REJ;	
 	
-	if (ap->ap_rv == PAM_SUCCESS) 
+	if (ap->ap_eval == PAM_SUCCESS) 
 		resp = SOD_AUTH_ACK;
 			
 	c_msg_prepare(ap->sc_uname, resp, sc, sc->sc_buf);

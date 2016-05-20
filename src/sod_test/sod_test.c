@@ -42,17 +42,22 @@
  
 #include <c_authenticator.h>
 
+struct sod_test_args {
+    char 	sta_user[C_NMAX + 1];
+    char 	sta_pw[C_NMAX + 1];
+};
+
 static pthread_t 	tid;
 
 static const int 	max_arg = 3;
 
 static char 	cmd[C_NMAX + 1];
-static char 	user[C_NMAX + 1];
-static char 	pw[C_NMAX + 1];
 
 static const char 	*sock_file = SOD_SOCK_FILE;
 
 static struct sockaddr_storage 	sap;
+static struct sockaddr_un *sun;
+static size_t len;
 
 static void 	cleanup(void);
 static void 	usage(void);
@@ -63,19 +68,29 @@ static void 	usage(void);
 void * 
 sod_test(void *arg)
 {
-	struct c_msg buf;
-	int srv, state;
+	struct sod_test_args *sta;
+	struct c_msg *buf;
+	int s, state;
 	long id;
 	char *tok;
 	
-	if (arg == NULL)
-		goto out;
+	if ((sta = arg) == NULL)
+	    goto bad;
+/*
+ * Connect with sod instance.
+ */	
+	if ((s = socket(sun->sun_family, SOCK_STREAM, 0)) < 0) 
+		goto bad;
+	
+	if (connect(s, (struct sockaddr *)sun, len) < 0)
+		goto bad1
 		
-	srv = *(int *)arg;	
-		
-	id = 0;	
+	if ((buf = c_msg_alloc()) == NULL)
+	    goto bad2;
+	
 	state = C_AUTHENTICATOR_AUTH_REQ;
-	tok = user;
+	id = 0;	
+	tok = sta->sta_user;
 	
 	while (state) {
 /*
@@ -86,9 +101,11 @@ sod_test(void *arg)
 /*
  * Create message.
  */ 
-			c_msg_prepare(tok, state, id, &buf);
-		
-			if (c_msg_handle(c_msg_send, srv, &buf) < 0) {
+			c_msg_prepare(tok, state, id, buf);
+/*
+ * Send message.
+ */ 		
+			if (c_msg_handle(c_msg_send, s, buf) < 0) {
 				syslog(LOG_ERR, 
 					"Can't send PAM_USER as request\n");
 				state = 0;
@@ -96,11 +113,11 @@ sod_test(void *arg)
 			}
 			syslog(LOG_ERR, 
 				"tx: C_AUTHENTICATOR_AUTH_REQ: %s\n", 
-				buf.sb_tok);		
+				buf->msg_tok);		
 /*
  * Await response.
  */			
-			if (c_msg_handle(c_msg_recv, srv, &buf) < 0) {
+			if (c_msg_handle(c_msg_recv, s, buf) < 0) {
 				syslog(LOG_ERR, 
 					"Can't receive "
 					"C_AUTHENTICATOR_AUTH_NAK "
@@ -113,10 +130,10 @@ sod_test(void *arg)
 /*
  * Cache for conversation need credentials.
  */
-				id = buf.msg_id;
+				id = buf->msg_id;
 			} 
 				
-			if (buf.msg_id != id) {
+			if (buf->msg_id != id) {
 				syslog(LOG_ERR, "Invalid tid received");
 				state = 0;
 				break;
@@ -124,17 +141,17 @@ sod_test(void *arg)
 /*
  * Determine state transition.
  */
-			state = buf.msg_code;
+			state = buf->msg_code;
 			break;
 		case C_AUTHENTICATOR_AUTH_NAK:
 			syslog(LOG_ERR, 
 				"rx: C_AUTHENTICATOR_AUTH_NAK: %s", 
-				buf.sb_tok);
+				buf->msg_tok);
 /*
  * Select for response need data.
  */		
 			state = C_AUTHENTICATOR_AUTH_REQ; 
-			tok = pw;	
+			tok = sta->sta_pw;	
 			break;
 		case C_AUTHENTICATOR_AUTH_ACK:
 			syslog(LOG_ERR, 
@@ -151,8 +168,11 @@ sod_test(void *arg)
 			break;
 		}
 	}
-	(void)memset(&buf, 0, sizeof(buf));
-out:
+bad2:
+	c_msg_free(buf);
+bad1:
+    (void)close(s);
+bad:
 	return (NULL);
 }
 
@@ -163,10 +183,9 @@ int
 main(int argc, char **argv) 
 {
 	void *rv = NULL;
-	static int s = 0;
+	int i = 0;
 	struct sigaction sa;
-	struct sockaddr_un *sun;
-	size_t len;
+	struct sod_test_args sta;
 	
 	sa.sa_handler = SIG_IGN;
 	(void)sigemptyset(&sa.sa_mask);
@@ -185,27 +204,24 @@ main(int argc, char **argv)
 /*
  * Cache arguments and prepare buffer.
  */		
-	(void)strncpy(user, argv[s++], C_NMAX);
-	(void)strncpy(pw, argv[s], C_NMAX);	
+	(void)memset(&sta, 0, sizeof(sta));
+	(void)strncpy(sta.sta_user, argv[i++], C_NMAX);
+	(void)strncpy(sta.sta_pw, argv[i], C_NMAX);	
 	(void)memset(&sap, 0, sizeof(sap));
 /*
- * Connect with sod instance.
+ * Create socket address.
  */	
-	sun = (struct sockaddr_un *)&sap;
+    sun = (struct sockaddr_un *)&sap;
 	sun->sun_family = AF_UNIX;
 	len = sizeof(sun->sun_path);
+	
 	(void)strncpy(sun->sun_path, sock_file, len - 1);
+
 	len += offsetof(struct sockaddr_un, sun_path);
-	
-	if ((s = socket(sun->sun_family, SOCK_STREAM, 0)) < 0) 
-		errx(EX_OSERR, "Can't create socket");
-	
-	if (connect(s, (struct sockaddr *)sun, len) < 0)
-		errx(EX_OSERR, "Can't connect with %s", sun->sun_path);
 /*
  * Execute.
  */ 
-	if (pthread_create(&tid, NULL, sod_test, &s) != 0)
+	if (pthread_create(&tid, NULL, sod_test, &sta) != 0)
 		errx(EX_OSERR, "Can't create pthread(3)");
 /*
  * Serialize, if possible.
@@ -214,7 +230,7 @@ main(int argc, char **argv)
 		errx(EX_OSERR, "Can't serialize execution of "
 			"former created pthread(3)"); 
 			
-	exit(0);
+	exit(EX_OK);
 }
 
 static void 

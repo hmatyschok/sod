@@ -47,7 +47,7 @@ c_msg_alloc(void)
 {
 	struct c_msg *msg;
 	
-	if ((msg = calloc(n, C_MSG_LEN)) != NULL) {
+	if ((msg = calloc(1, C_MSG_LEN)) != NULL) {
 		msg->msg_id = C_MSG;
 		msg->msg_len = C_MSG_LEN;
 	}
