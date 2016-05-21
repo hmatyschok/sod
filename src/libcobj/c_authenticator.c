@@ -40,7 +40,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include <c_authenticator.h>
+#include "c_authenticator.h"
 
 #define	C_AUTHENTICATOR_BACKOFF_DFLT 	3
 #define	C_AUTHENTICATOR_RETRIES_DFLT 	10
@@ -86,7 +86,7 @@ static ca_state_fn_t 	c_authenticator_authenticate(struct ca_softc *);
 static ca_state_fn_t 	c_authenticator_establish(struct ca_softc *);
 
 static void * 	c_authenticator_start(void *); 
- 
+static void     c_authenticator_stop(void *);
 static struct c_thr * 	c_authenticator_create(int, int);
 static int 	c_authenticator_destroy(struct c_thr *); 
 
@@ -204,7 +204,7 @@ c_authenticator_destroy(struct c_thr *thr)
 	this = &c_authenticator_class;
 	cm = &this->c_base;
 	
-	return ((*cm->cm_destroy)(thr));
+	return ((*cm->cm_destroy)(this, thr));
 }
 
 /******************************************************************************

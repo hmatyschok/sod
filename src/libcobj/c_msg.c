@@ -37,7 +37,7 @@
  * Generating set contains Message primitives.
  */
 
-#include <c_msg.h>
+#include "c_msg.h"
 
 /*
  * Allocate message primitive.

@@ -25,28 +25,18 @@
  * version=0.2
  */
 
-#include <sys/time.h>
 #include <sys/types.h>
-
 #include <db.h>
-#include <err.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sysexits.h>
-#include <syslog.h>
 
-#include <c_obj.h>
+#include "c_obj.h"
 
 /*
  * Set contains abstract components.
  */
 
-typedef int  	(*c_cache_fn_t)(struct c_cache *, DBT *, DBT *);
+typedef int  	(*c_cache_fn_t)(struct c_cache *, DBT *, void *);
 
 static int 	c_cache_init(struct c_cache *);
 static void *   c_cache_add(struct c_cache *, DBT *, void *);
@@ -65,7 +55,7 @@ static void * 	c_nop_init(void *);
 static int 	c_nop_fini(void *);
 static void * 	c_nop_create(void *);
 static void * 	c_nop_start(void *);
-static int 	c_nop_stop(void *);
+static void 	c_nop_stop(void *);
 static int 	c_nop_destroy(void *);
 
 /******************************************************************************
@@ -100,7 +90,7 @@ static struct c_methods c_nop = {
 static struct c_class c_base_class = {
 	.c_obj = {
 		.c_id 		= C_BASE_CLASS,
-		.c_len 		= C_BASE_CLASS_LEN,
+		.c_len 		= C_BASE_LEN,
 	},
 	.c_base = {
 		.cm_co = {

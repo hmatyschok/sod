@@ -25,10 +25,8 @@
  * version=0.2 
  */
 
-#include <sys/types.h>
-
+#include <sys/queue.h>
 #include <pthread.h>
-#include <unistd.h>
 
 struct c_obj;
 
@@ -54,7 +52,7 @@ struct c_obj {
 	long 	co_id; 	/* identifier */
 	size_t 	co_len;
 	
-	TAILQ_NEXT(c_obj) co_next;
+	TAILQ_ENTRY(c_obj) co_next;
 };
 TAILQ_HEAD(c_obj_hd, c_obj);
 
@@ -63,8 +61,8 @@ TAILQ_HEAD(c_obj_hd, c_obj);
  * based on db(3) API. 
  */
 struct c_cache {
-	struct c_obj_hd 	ch_hd;
-	DB 	*ch_db;
+	struct c_obj_hd 	cc_hd;
+	DB 	*cc_db;
 };
 
 /*
@@ -75,7 +73,7 @@ struct c_methods {
 #define cm_id 	cm_co.co_id
 #define cm_len 	cm_co.co_len
 	c_init_t 		cm_init;
-	c_fini_t 		cm_free;
+	c_fini_t 		cm_fini;
 /*
  * Methods implemets life-cycle of an instance.  
  */	

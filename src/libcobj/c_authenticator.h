@@ -25,8 +25,6 @@
  * version=0.2
  */
 
-#include <c_msg.h>
-
 #define C_AUTHENTICATOR_CLASS 	1421959420
 
 #define C_AUTHENTICATOR_AUTH_REQ 	0x00000001
