@@ -47,20 +47,14 @@ struct sod_test_args {
     char 	sta_pw[C_NMAX + 1];
 };
 
-static pthread_t 	tid;
-
 static const int 	max_arg = 3;
-
-static char 	cmd[C_NMAX + 1];
-
 static const char 	*sock_file = SOD_SOCK_FILE;
 
 static struct sockaddr_storage 	sap;
 static struct sockaddr_un *sun;
 static size_t len;
 
-static void 	cleanup(void);
-static void 	usage(void);
+static pthread_t 	tid;
 
 /*
  * By pthread(3) called start routine.
@@ -183,7 +177,6 @@ int
 main(int argc, char **argv) 
 {
 	void *rv = NULL;
-	int i = 0;
 	struct sigaction sa;
 	struct sod_test_args sta;
 	
@@ -194,19 +187,16 @@ main(int argc, char **argv)
 	if (sigaction(SIGCHLD, &sa, NULL) < 0)
 		errx(EX_OSERR, "Can't disable SIGCHLD");
 
-	if (atexit(cleanup) < 0)
-		errx(EX_OSERR, "Can't register exit handle");
-	
-	(void)strncpy(cmd, argv[s++], C_NMAX);
+	(void)strncpy(cmd, argv[i++], C_NMAX);
 		
 	if (argc != max_arg)
-		usage();
+		errx(EX_USAGE, "\nusage: %s user pw\n", argv[0]);
 /*
  * Cache arguments and prepare buffer.
  */		
 	(void)memset(&sta, 0, sizeof(sta));
-	(void)strncpy(sta.sta_user, argv[i++], C_NMAX);
-	(void)strncpy(sta.sta_pw, argv[i], C_NMAX);	
+	(void)strncpy(sta.sta_user, argv[1], C_NMAX);
+	(void)strncpy(sta.sta_pw, argv[2], C_NMAX);	
 	(void)memset(&sap, 0, sizeof(sap));
 /*
  * Create socket address.
@@ -233,14 +223,3 @@ main(int argc, char **argv)
 	exit(EX_OK);
 }
 
-static void 
-cleanup(void) 
-{
-	(void)memset(&sap, 0, sizeof(sap));
-}
-
-static void 
-usage(void)
-{
-	errx(EX_USAGE, "\nusage: %s user pw\n", cmd);
-}

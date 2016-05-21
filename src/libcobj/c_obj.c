@@ -245,12 +245,12 @@ c_thr_create(void *arg)
 	
 	thr->ct_len = cls->c_len;
 	
-	if (c_cache_fn(c_cache_add, &cls->c_instances, thr) == NULL)
-		goto bad3;
+	if (c_cache_fn(c_cache_add, &cls->c_instances, thr) == NULL) {
+	    (void)pthread_cancel(thr->ct_tid);
+		goto bad2;
+	}
 out:		
 	return (thr);
-bad3:
-	(void)pthread_cancel(thr->ct_tid);
 bad2:	
 	(void)pthread_mutex_destroy(&thr->ct_mtx);
 bad1:
@@ -446,6 +446,21 @@ c_cache_del(struct c_cache *ch, DBT *key, void *arg __unused)
 	return (data.data);
 }
 
+static void *
+c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
+{
+	struct c_obj *co;	
+	DBT key;
+
+	if ((co = arg) == NULL)
+	    return (-1);
+	
+	key.data = &co->co_id;
+	key.size = sizeof(co->co_id);
+	
+	return ((*fn)(ch, &key, arg));
+}
+
 /*
  * Release by in-memory db(3) bound ressources,
  * if all objects were released previously.
@@ -468,21 +483,4 @@ c_cache_free(struct c_cache *ch)
 	ch->ch_db = NULL;
 		
 	return (0);
-}
-
-static void *
-c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
-{
-	struct c_obj *co;
-	
-	DBT key;
-	DBT data;
-	
-	if ((co = arg) == NULL)
-	    return (-1);
-	
-	key.data = &co->co_id;
-	key.size = sizeof(co->co_id);
-	
-	return ((*fn)(ch, &key, arg));
 }

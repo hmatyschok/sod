@@ -166,24 +166,21 @@ c_authenticator_class_fini(void)
  * Ctor.
  */
 static struct c_thr *
-c_authenticator_create(int srv, int rmt) 
+c_authenticator_create(int sock_srv, int sock_rmt) 
 {
 	struct c_class *this;
 	struct c_methods *cm;
 	struct ca_softc *sc;
-	struct pam_conv *pamc;
 	struct c_thr *thr;
 	
 	this = &c_authenticator_class;
 	cm = &this->c_base;
 	
 	if ((sc = (*cm->cm_create)(this)) != NULL) {
-		sc->sc_sock_rmt = rmt;
-		sc->sc_sock_cli = cli;
-	
-		pamc = &sc->sc_pamc;
-		pamc->appdata_ptr = sc;
-		pamc->conv = ap_conv;
+		sc->sc_sock_rmt = sock_rmt;
+		sc->sc_sock_cli = sock_cli;
+		sc->sc_pamc.appdata_ptr = sc;
+		sc->sc_pamc.conv = c_authenticator_conv;
 		
 		thr = &sc->sc_thr;
 /*
@@ -202,7 +199,7 @@ static int
 c_authenticator_destroy(struct c_thr *thr) 
 {
 	struct c_class *this;
-	struct c_methods *base;
+	struct c_methods *cm;
 	
 	this = &c_authenticator_class;
 	cm = &this->c_base;
