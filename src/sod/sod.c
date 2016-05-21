@@ -70,6 +70,9 @@ static void 	sod_errx(int, const char *, ...);
 static void 	sod_atexit(void);
 static void *	sod_sigaction(void *);
 
+/*
+ * Abnormal process termination.
+ */
 static void 	
 sod_errx(int eval, const char *fmt, ...)
 {
@@ -81,12 +84,16 @@ sod_errx(int eval, const char *fmt, ...)
 	exit(eval);
 }
 
+/*
+ * byr atextit(3) registered cleanup handler. 
+ */
 static void 
 sod_atexit(void)
 {
 	if (ca != NULL) 
-		(void)c_authenticator_class_free();
-	
+		(void)c_authenticator_class_fini(); {
+	    (void)c_base_class_fini();
+	}
 	(void)unlink(sock_file);
 	(void)unlink(pid_file);
 	
@@ -122,8 +129,7 @@ sod_sigaction(void *arg)
 		default:	
 			break;
 		}	
-	}
-out:	
+	}	
 	return (NULL);
 }
 

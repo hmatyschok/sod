@@ -22,7 +22,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# version=0.1
+# version=0.2
 
 LIB=	cobj
 
@@ -39,8 +39,7 @@ SRCS=	c_obj.c \
 
 INCS=	c_obj.h \
 		c_msg.h \
-		c_authenticator.h \
-		...
+		c_authenticator.h 
 
 WARNS?=	3
 

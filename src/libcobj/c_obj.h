@@ -22,14 +22,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * version=0.1 
+ * version=0.2 
  */
 
 #include <sys/types.h>
 
 #include <pthread.h>
 #include <unistd.h>
-
 
 struct c_obj;
 
