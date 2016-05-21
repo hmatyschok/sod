@@ -155,7 +155,7 @@ c_authenticator_class_fini(void)
 	this = &c_authenticator_class;
 	cm = &this->c_base;
 	
-	return ((*cm->cm_destroy)(this));	
+	return ((*cm->cm_fini)(this));	
 }
 
 /******************************************************************************

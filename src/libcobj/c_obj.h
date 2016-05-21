@@ -109,7 +109,6 @@ struct c_class {
 #define C_BASE_CLASS 	1463676824
 #define C_BASE_LEN 	(sizeof(structc_class))
 
-
 /*
  * By pthread(3) covered instance.
  */
