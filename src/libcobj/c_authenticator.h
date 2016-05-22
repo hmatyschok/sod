@@ -25,6 +25,9 @@
  * version=0.2
  */
 
+#ifndef _C_AUTHENTICATOR_H_
+#define	_C_AUTHENTICATOR_H_
+
 #define C_AUTHENTICATOR_CLASS 	1421959420
 
 #define C_AUTHENTICATOR_AUTH_REQ 	0x00000001
@@ -57,3 +60,5 @@ __BEGIN_DECLS
 struct c_authenticator * 	c_authenticator_class_init(void);
 int 	c_authenticator_class_free(void);
 __END_DECLS
+
+#endif /* _C_AUTHENTICATOR_H_ */

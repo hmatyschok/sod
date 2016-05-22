@@ -25,6 +25,9 @@
  * version=0.2 
  */
 
+#ifndef _C_MSG_H_
+#define	_C_MSG_H_
+
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -61,3 +64,6 @@ ssize_t 	c_msg_recv(int, struct msghdr *, int);
 int 	c_msg_fn(c_msg_t, int, struct c_msg *);
 void 	c_msg_free(struct c_msg *);
 __END_DECLS
+
+#endif /* _C_MSG_H_ */
+

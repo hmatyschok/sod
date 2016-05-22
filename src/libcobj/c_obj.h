@@ -25,6 +25,9 @@
  * version=0.2 
  */
 
+#ifndef _C_OBJ_H_
+#define	_C_OBJ_H_
+
 #include <sys/queue.h>
 #include <pthread.h>
 
@@ -127,3 +130,4 @@ void * 	c_base_class_init(void);
 int 	c_base_class_fini(void);
 __END_DECLS
 
+#endif /* _C_OBJ_H_ */
