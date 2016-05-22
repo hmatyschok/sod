@@ -28,7 +28,11 @@
 #ifndef _C_AUTHENTICATOR_H_
 #define	_C_AUTHENTICATOR_H_
 
-#define C_AUTHENTICATOR_CLASS 	1421959420
+#define	C_AUTHENTICATOR_BACKOFF_DFLT 	3
+#define	C_AUTHENTICATOR_RETRIES_DFLT 	10
+
+#define	C_AUTHENTICATOR_PROMPT_DFLT		"login: "
+#define	C_AUTHENTICATOR_PW_PROMPT_DFLT	"Password:"
 
 #define C_AUTHENTICATOR_AUTH_REQ 	0x00000001
 #define C_AUTHENTICATOR_TERM_REQ 	0x00000002
@@ -53,7 +57,7 @@ struct c_authenticator {
 
 __BEGIN_DECLS
 struct c_authenticator * 	c_authenticator_class_init(void);
-int 	c_authenticator_class_free(void);
+int 	c_authenticator_class_fini(void);
 __END_DECLS
 
 #endif /* _C_AUTHENTICATOR_H_ */

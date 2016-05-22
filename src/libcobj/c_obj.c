@@ -25,6 +25,8 @@
  * version=0.2
  */
 
+#include <sys/time.h>
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -48,12 +50,14 @@ static void * 	c_cache_fn(c_cache_fn_t, struct c_cache *, void *);
 static void *	c_class_init(void *);
 static int 	c_class_fini(void *);
 static void * 	c_thr_create(void *);
+static int  c_thr_wait(void *, u_int);
 static int 	c_thr_destroy(void *, void *);
 
 static void * 	c_nop_init(void *);
 static int 	c_nop_fini(void *);
 static void * 	c_nop_create(void *);
 static void * 	c_nop_start(void *);
+static int  c_nop_wait(void *, u_int);
 static int 	c_nop_stop(void *);
 static int 	c_nop_destroy(void *, void *);
 
@@ -73,6 +77,7 @@ static struct c_methods c_nop = {
 	.cm_fini 		= c_nop_fini,
 	.cm_create 		= c_nop_create,
 	.cm_start 		= c_nop_start,
+	.cm_wait        = c_nop_wait,
 	.cm_stop 		= c_nop_stop,
 	.cm_destroy 		= c_nop_destroy,
 }; 
@@ -100,6 +105,7 @@ static struct c_class c_base_class = {
 		.cm_fini 		= c_class_fini,
 		.cm_create 		= c_thr_create,
 		.cm_start 		= c_nop_start,
+		.cm_wait        = c_thr_wait,
 		.cm_stop 		= c_nop_stop,
 		.cm_destroy 		= c_thr_destroy,
 	},
@@ -251,6 +257,42 @@ bad:
 }
 
 /*
+ * Fell asleep for ts seconds.
+ */
+static int 
+c_thr_wait(void *arg, u_int ts)
+{
+	struct c_thr *thr = NULL;
+	
+	u_int uts;	
+	
+	struct timespec ttw;
+	struct timeval x;
+	int eval = -1;
+	
+	if ((thr = arg) == NULL) 
+		goto out;
+	
+	if ((uts = (ts * 1000)) == 0)
+		goto out;
+	
+/* ... */
+	
+	while (eval < 0)
+		eval = gettimeofday(&x, NULL);
+	
+	ttw.tv_sec = x.tv_sec + ts;
+	ttw.tv_nsec = (x.tv_usec + uts) * 1000UL;
+	
+	eval = pthread_cond_timedwait(&thr->ct_cv, &thr->ct_mtx, &ttw);
+
+/* ... */
+
+out:	
+	return (eval);
+}
+
+/*
  * Release lock, if any and release 
  * by pthread(3) private data bound 
  * ressources.
@@ -333,6 +375,13 @@ c_nop_start(void *arg)
 {
 
 	return (NULL);
+}
+
+static int  
+c_nop_wait(void *arg, u_int ts)
+{
+
+    return (-1);
 }
 
 static int 	

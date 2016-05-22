@@ -25,17 +25,19 @@
  * version=0.2
  */
 
-
 #include <security/pam_appl.h>
+#include <sys/types.h>
+
+#include <login_cap.h>
+#include <pwd.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <syslog.h>
+#include <unistd.h>
 
 #include "c_obj.h"
 #include "c_authenticator.h"
-
-#define	C_AUTHENTICATOR_BACKOFF_DFLT 	3
-#define	C_AUTHENTICATOR_RETRIES_DFLT 	10
-
-#define	C_AUTHENTICATOR_PROMPT_DFLT		"login: "
-#define	C_AUTHENTICATOR_PW_PROMPT_DFLT	"Password:"
 
 /*
  * Recursively defined callback function. 
@@ -49,8 +51,8 @@ typedef ca_state_fn_t 	(*ca_state_t)(void *);
 
 struct ca_softc {
 	struct c_thr 	sc_thr; 	/* binding, pthread(3) */
-#define sc_id 	sc_thr.c_obj.c_id
-#define sc_len 	sc_thr.c_obj.c_len	
+#define sc_id 	sc_thr.ct_co.co_id
+#define sc_len 	sc_thr.ct_co.co_len	
 	char sc_hname[C_NMAX + 1];
 	char sc_uname[C_NMAX + 1];
 	const char 	*sc_prompt;
@@ -64,18 +66,20 @@ struct ca_softc {
 
 	uint32_t 	sc_sock_srv; 	/* fd, socket, applicant */
 	uint32_t 	sc_sock_rmt; 	/* fd, socket, applicant */
-	uint32_t 	sc_rv; 	/* tracks rv of pam(3) method calls */		
+	uint32_t 	sc_eval; 	/* tracks rv of pam(3) method calls */		
 };
-#define C_AUTHENTICATOR_LEN (sizeof(struct ca_softc *sc,))
+#define C_AUTHENTICATOR_CLASS 	1421959420
+#define C_AUTHENTICATOR_LEN (sizeof(struct ca_softc))
 
 static int 	c_authenticator_conv(int, const struct pam_message **, 
 	struct pam_response **, void *);
-static ca_state_fn_t 	c_authenticator_response(struct ca_softc *);
-static ca_state_fn_t 	c_authenticator_authenticate(struct ca_softc *);
-static ca_state_fn_t 	c_authenticator_establish(struct ca_softc *);
+static ca_state_fn_t 	c_authenticator_response(void *);
+static ca_state_fn_t 	c_authenticator_authenticate(void *);
+static ca_state_fn_t 	c_authenticator_establish(void *);
 
 static void * 	c_authenticator_start(void *); 
 static int     c_authenticator_stop(void *);
+
 static struct c_thr * 	c_authenticator_create(int, int);
 static int 	c_authenticator_destroy(struct c_thr *); 
 
@@ -89,15 +93,15 @@ static struct c_authenticator c_authenticator_methods = {
 };
 
 static struct c_class c_authenticator_class = {
-	.c_obj = {
-		.c_id 		= C_AUTHENTICATOR_CLASS,
-		.c_len 		= C_AUTHENTICATOR_LEN,
+	.c_co = {
+		.co_id 		= C_AUTHENTICATOR_CLASS,
+		.co_len 		= C_AUTHENTICATOR_LEN,
 	},
 	.c_public 		= &c_authenticator_methods,
 };
 
-static const char 	*ca_default_prompt = C_AUTHENTICATOR_PROMPT_DFLT;
-static const char 	*ca_default_pw_prompt = C_AUTHENTICATOR_PW_PROMPT_DFLT;
+static const char 	*ca_prompt_default = C_AUTHENTICATOR_PROMPT_DFLT;
+static const char 	*ca_pw_prompt_default = C_AUTHENTICATOR_PW_PROMPT_DFLT;
 
 /******************************************************************************
  * Class-methods.
@@ -121,8 +125,8 @@ c_authenticator_class_init(void)
 	if ((cm = (*cm->cm_init)(this)) == NULL)
 		return (NULL);
 
-	cm->cm_obj_start = c_authenticate_start;
-	cm->cm_obj_stop = c_authenticate_stop;
+	cm->cm_start = c_authenticator_start;
+	cm->cm_stop = c_authenticator_stop;
 	
 	return (this->c_public);	
 }
@@ -134,7 +138,7 @@ c_authenticator_class_init(void)
 int  
 c_authenticator_class_fini(void)
 {
-	struct *c_class *this;
+	struct c_class *this;
 	struct c_methods *cm;
 
 	this = &c_authenticator_class;
@@ -163,7 +167,7 @@ c_authenticator_create(int sock_srv, int sock_rmt)
 	
 	if ((sc = (*cm->cm_create)(this)) != NULL) {
 		sc->sc_sock_rmt = sock_rmt;
-		sc->sc_sock_cli = sock_cli;
+		sc->sc_sock_srv = sock_srv;
 		sc->sc_pamc.appdata_ptr = sc;
 		sc->sc_pamc.conv = c_authenticator_conv;
 		
@@ -171,7 +175,7 @@ c_authenticator_create(int sock_srv, int sock_rmt)
 /*
  * Release stalled execution.
  */		
-		(void)pthread_cond_signal(&thr->c_cv);
+		(void)pthread_cond_signal(&thr->ct_cv);
 	} else
 		thr = NULL;
 	return (thr);
@@ -237,7 +241,7 @@ c_authenticator_conv(int num_msg, const struct pam_message **msg,
 			break; 
 					
 		c_msg_prepare(msg[i]->msg, C_AUTHENTICATOR_AUTH_NAK, 
-			sc->sc_id, sc->sc_buf);
+			sc->sc_id, &sc->sc_buf);
 /*
  * Request PAM_AUTHTOK.
  */				
@@ -249,20 +253,20 @@ c_authenticator_conv(int num_msg, const struct pam_message **msg,
 		if (c_msg_fn(c_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0)
 			break;
 	
-		if (sc->sc_buf->msg_id != sc->sc_id)	
+		if (sc->sc_buf.msg_id != sc->sc_id)	
 			break;	
 			
-		if (sc->sc_buf->msg_code != C_AUTHENTICATOR_AUTH_REQ)
+		if (sc->sc_buf.msg_code != C_AUTHENTICATOR_AUTH_REQ)
 			break;
 	
 		if ((tok[i].resp = calloc(1, C_NMAX + 1)) == NULL) 
 			break;
 			
 #ifdef C_OBJ_DEBUG
-syslog(LOG_ERR, "%s: rx: %s\n", __func__, sc->sc_buf->msg_tok);	
+syslog(LOG_ERR, "%s: rx: %s\n", __func__, sc->sc_buf.msg_tok);	
 #endif /* C_OBJ_DEBUG */	
 				
-		(void)strncpy(tok[i].resp, sc->sc_buf->msg_tok, C_NMAX);
+		(void)strncpy(tok[i].resp, sc->sc_buf.msg_tok, C_NMAX);
 		(void)memset(&sc->sc_buf, 0, sizeof(sc->sc_buf));
 	}
 	
@@ -305,15 +309,15 @@ c_authenticator_start(void *arg)
 	if ((sc = arg) == NULL)
 		goto out;
 	
-	(void)pthread_mutex_lock(&sc->c_thr.c_mtx);
+	(void)pthread_mutex_lock(&sc->sc_thr.ct_mtx);
 	
-	if (pthread_cond_wait(&sc->c_thr.c_cv, &sc->c_thr.c_mtx) == 0)
-		ca_state = (ca_state_fn_t)ap_establish;	
+	if (pthread_cond_wait(&sc->sc_thr.ct_cv, &sc->sc_thr.ct_mtx) == 0)
+		fn = (ca_state_t)c_authenticator_establish;	
 	
 	while (fn != NULL)
 		fn = (ca_state_t)(*fn)(sc);
 		
-	(void)pthread_mutex_unlock(&sc->c_thr.c_mtx);
+	(void)pthread_mutex_unlock(&sc->sc_thr.ct_mtx);
 out:	
 	return (arg);
 }	
@@ -324,7 +328,7 @@ out:
 static ca_state_fn_t 
 c_authenticator_establish(void *arg)
 {
-	ca_state_fn_t ca_state = NULL;
+	ca_state_fn_t state = NULL;
 	struct ca_softc *sc;
 
 	if ((sc = arg) == NULL)
@@ -334,30 +338,30 @@ c_authenticator_establish(void *arg)
 syslog(LOG_ERR, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */	
 	
-	if (c_msg_fn(c_msg_recv, sc->sc_sock_rmt, sc->sc_buf) < 0) 
+	if (c_msg_fn(c_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0) 
 		goto out;
 /*
  * An running instance cannot send messages to itself.
  */	
-	if (sc->sc_buf->msg_id == sc->sc_id)
+	if (sc->sc_buf.msg_id == sc->sc_id)
 		goto out;
 /*
  * State transition, if any.
  */
-	if (sc->sc_buf->msg_code == C_AUTHENTICATOR_AUTH_REQ) 
-		ca_state = (ca_state_fn_t)ap_authenticate;
+	if (sc->sc_buf.msg_code == C_AUTHENTICATOR_AUTH_REQ) 
+		state = (ca_state_fn_t)c_authenticator_authenticate;
 	
-	if (ca_state == NULL)
+	if (state == NULL)
 		goto out;
 /*
  * Create < hostname, user > tuple.
  */
-	if (gethostname(ap->sc_hname, C_NMAX) == 0) 
-		(void)strncpy(ap->sc_uname, sc->sc_buf->msg_tok, C_NMAX);
+	if (gethostname(sc->sc_hname, C_NMAX) == 0) 
+		(void)strncpy(sc->sc_uname, sc->sc_buf.msg_tok, C_NMAX);
 	else
-		ca_state = NULL;
+		state = NULL;
 out:	
-	return (ca_state);
+	return (state);
 }
 
 /*
@@ -366,7 +370,7 @@ out:
 static ca_state_fn_t  
 c_authenticator_authenticate(void *arg)
 {	
-	ca_state_fn_t ca_state = NULL;
+	ca_state_fn_t state = NULL;
 	login_cap_t *lc = NULL;
 	struct ca_softc *sc;
 	int retries, backoff;
@@ -384,10 +388,10 @@ syslog(LOG_ERR, "%s\n", __func__);
  * Parts of in login.c defined codesections are reused here.
  */	
 	lc = login_getclass(NULL);
-	ap->sc_prompt = login_getcapstr(lc, "login_prompt", 
-		ap_default_prompt, ap_default_prompt);
-	ap->sc_pw_prompt = login_getcapstr(lc, "passwd_prompt", 
-		ap_default_pw_prompt, ap_default_pw_prompt);
+	sc->sc_prompt = login_getcapstr(lc, "login_prompt", 
+		ca_prompt_default, ca_prompt_default);
+	sc->sc_pw_prompt = login_getcapstr(lc, "passwd_prompt", 
+		ca_pw_prompt_default, ca_pw_prompt_default);
 	retries = login_getcapnum(lc, "login-retries", 
 		C_AUTHENTICATOR_RETRIES_DFLT, C_AUTHENTICATOR_RETRIES_DFLT);
 	backoff = login_getcapnum(lc, "login-backoff", 
@@ -397,61 +401,61 @@ syslog(LOG_ERR, "%s\n", __func__);
 /*
  * Verify, if username exists in passwd database. 
  */
-	if ((ap->sc_pwd = getpwnam(ap->sc_uname)) != NULL) {
+	if ((sc->sc_pwd = getpwnam(sc->sc_uname)) != NULL) {
 /*
  * Verify if user has UID 0.
  */
-		if (ap->sc_pwd->pw_uid == (uid_t)0) 
-			ap->ap_eval = PAM_PERM_DENIED;
+		if (sc->sc_pwd->pw_uid == (uid_t)0) 
+			sc->sc_eval = PAM_PERM_DENIED;
 		else
-			ap->ap_eval = PAM_SUCCESS;
+			sc->sc_eval = PAM_SUCCESS;
 	} else 
-		ap->ap_eval = PAM_USER_UNKNOWN;
+		sc->sc_eval = PAM_USER_UNKNOWN;
 	
 	endpwent();
 	
-	if (ap->ap_eval == PAM_SUCCESS)
+	if (sc->sc_eval == PAM_SUCCESS)
 		ask = 1;
 	
 	while (ask != 0) {
 /*
  * Service name for pam(8) is defined implecitely.
  */		
-		ap->ap_eval = pam_start(__func__, ap->sc_uname, 
-			&ap->sc_pamc, &ap->sc_pamh);
+		sc->sc_eval = pam_start(__func__, sc->sc_uname, 
+			&sc->sc_pamc, &sc->sc_pamh);
 
-		if (ap->ap_eval == PAM_SUCCESS) {
-			ap->ap_eval = pam_set_item(ap->sc_pamh, PAM_RUSER, 
-				ap->sc_uname);
+		if (sc->sc_eval == PAM_SUCCESS) {
+			sc->sc_eval = pam_set_item(sc->sc_pamh, PAM_RUSER, 
+				sc->sc_uname);
 		}
 	
-		if (ap->ap_eval == PAM_SUCCESS) {
-			ap->ap_eval = pam_set_item(ap->sc_pamh, PAM_RHOST, 
-				ap->sc_hname);
+		if (sc->sc_eval == PAM_SUCCESS) {
+			sc->sc_eval = pam_set_item(sc->sc_pamh, PAM_RHOST, 
+				sc->sc_hname);
 		}
 	
-		if (ap->ap_eval == PAM_SUCCESS) {
-			ap->ap_eval = pam_authenticate(ap->sc_pamh, 0);
+		if (sc->sc_eval == PAM_SUCCESS) {
+			sc->sc_eval = pam_authenticate(sc->sc_pamh, 0);
 /*
  * Authenticate.
  */
 			
-			if (ap->ap_eval == PAM_AUTH_ERR) {				
+			if (sc->sc_eval == PAM_AUTH_ERR) {				
 /*
  * Reenter loop, if PAM_AUTH_ERR condition halts. 
  */
 				cnt += 1;	
 		
 				if (cnt > backoff) 
-					(*ap->ap_thr.cobj_wait)
-						((u_int)((cnt - backoff) * 5), sc);
+					(*c_authenticator_class.c_base.cm_wait)
+						(sc, (u_int)((cnt - backoff) * 5));
 		
 				if (cnt >= retries)
 					ask = 0;		
 	
-				(void)pam_end(ap->sc_pamh, ap->ap_eval);
+				(void)pam_end(sc->sc_pamh, sc->sc_eval);
 		
-				ap->sc_pamh = NULL;
+				sc->sc_pamh = NULL;
 			} else
 				ask = 0;	
 		} else
@@ -462,13 +466,13 @@ syslog(LOG_ERR, "%s\n", __func__);
  */			
 	resp = C_AUTHENTICATOR_AUTH_REJ;	
 	
-	if (ap->ap_eval == PAM_SUCCESS) 
-		resp = SOD_AUTH_ACK;
+	if (sc->sc_eval == PAM_SUCCESS) 
+		resp = C_AUTHENTICATOR_AUTH_ACK;
 			
-	c_msg_prepare(ap->sc_uname, resp, sc, sc->sc_buf);
-	ca_state = (ca_state_fn_t)ap_response;
+	c_msg_prepare(sc->sc_uname, resp, sc->sc_id, &sc->sc_buf);
+	state = (ca_state_fn_t)c_authenticator_response;
 out:	
-	return (ca_state);
+	return (state);
 }
 
 /*
@@ -477,7 +481,7 @@ out:
 static ca_state_fn_t  
 c_authenticator_response(void *arg)
 {	
-	ca_state_fn_t ca_state = NULL;
+	ca_state_fn_t state = NULL;
 	struct ca_softc *sc;
 
 	if ((sc = arg) == NULL)
@@ -487,10 +491,9 @@ c_authenticator_response(void *arg)
 syslog(LOG_ERR, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */
 
-	if (c_msg_fn(c_msg_send, sc->sc_sock_rmt, sc->sc_buf) < 0)
-		(*ap->ap_thr.cobj_exit)(EX_OSERR, __func__, sc);
+	(void)c_msg_fn(c_msg_send, sc->sc_sock_rmt, &sc->sc_buf);
 out:	
-	return (ca_state);
+	return (state);
 }
 
 /*
@@ -505,9 +508,9 @@ c_authenticator_stop(void *arg)
 		return (-1);
 
 	if (sc->sc_pamh != NULL)
-		(void)pam_end(sc->sc_pamh, sc->sc_rv);
+		(void)pam_end(sc->sc_pamh, sc->sc_eval);
 
-	(void)close(sc->sc_sock_cli);
+	(void)close(sc->sc_sock_rmt);
 
 #ifdef C_OBJ_DEBUG		
 syslog(LOG_ERR, "%s\n", __func__);
