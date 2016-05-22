@@ -25,11 +25,6 @@
  * version=0.2
  */
 
-#include <sys/types.h>
-
-#include <db.h>
-#include <fcntl.h>
-#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 

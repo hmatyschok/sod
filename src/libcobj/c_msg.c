@@ -24,21 +24,15 @@
  * 
  * version=0.2
  */
- 
-#include <err.h>
-#include <stdarg.h>
+
 #include <stdlib.h>
 #include <string.h>
-#include <sysexits.h>
-#include <syslog.h>
-#include <unistd.h>
 
 /*
  * Generating set contains Message primitives.
  */
 
 #include "c_obj.h"
-#include "c_msg.h"
 
 /*
  * Allocate message primitive.
@@ -103,10 +97,10 @@ c_msg_fn(c_msg_fn_t fn, int s, struct c_msg *msg)
 	if (msg == NULL)
 		goto out;
 
-	if (c_msg == NULL)
+	if (fn == NULL)
 		goto out;
 
-	if ((len = msg->msg_len) != C_MSG_LEN)
+	if (msg->msg_len != C_MSG_LEN)
 		goto out;
 
 	if (fn == c_msg_recv || fn == c_msg_send) {
@@ -115,8 +109,8 @@ c_msg_fn(c_msg_fn_t fn, int s, struct c_msg *msg)
 	
 		(void)memset(&msg, 0, sizeof(mh));
 	
-		msg.msg_iov = &vec;
-		msg.msg_iovlen = 1;			
+		mh.msg_iov = &vec;
+		mh.msg_iovlen = 1;			
 		
 		if ((*fn)(s, &mh, 0) == msg->msg_len)
 			eval = 0;	
@@ -130,7 +124,7 @@ out:
  * releases bound ressources.
  */
 void 
-c_free_msg(struct c_msg *msg)
+c_msg_free(struct c_msg *msg)
 {
 	if (msg != NULL) {
 		(void)memset(msg, 0, sizeof(*msg));

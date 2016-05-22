@@ -38,7 +38,6 @@ SRCS=	c_obj.c \
 		c_authenticator.c 
 
 INCS=	c_obj.h \
-		c_msg.h \
 		c_authenticator.h 
 
 WARNS?=	3

@@ -28,10 +28,26 @@
 #ifndef _C_OBJ_H_
 #define	_C_OBJ_H_
 
+#include <sys/types.h>
 #include <sys/queue.h>
+#include <sys/socket.h>
+
+#include <db.h>
+#include <fcntl.h>
+#include <limits.h>
 #include <pthread.h>
 
 struct c_obj;
+
+/*
+ * Service Primitives (SPI).
+ */
+
+#define C_MSG_ACK 	0x00000010
+#define C_MSG_NAK 	0x00000020
+#define C_MSG_REJ 	0x00000030
+
+typedef ssize_t 	(*c_msg_fn_t)(int, struct msghdr *, int);
 
 #define C_NMAX 	127
 
@@ -53,7 +69,7 @@ typedef int 	(*c_destroy_t)(void *, void *);
  */
 struct c_obj {
 	long 	co_id; 	/* identifier */
-	size_t 	co_len;
+	ssize_t 	co_len;
 	
 	TAILQ_ENTRY(c_obj) co_next;
 };
@@ -125,9 +141,30 @@ struct c_thr {
 	pthread_t 	ct_tid;
 };
 
+/*
+ * MPI encapsulates message token.
+ */
+ 
+struct c_msg {
+	struct c_obj 	msg_obj;	
+#define msg_id 	msg_obj.co_id
+#define msg_len 	msg_obj.co_len
+	int 	msg_code; 	/* encodes request or response */
+	char 	msg_tok[C_NMAX + 1];
+};
+#define C_MSG 	1463677004
+#define C_MSG_LEN 	(sizeof(struct c_msg))
+#define C_MSG_QLEN 	13
+
 __BEGIN_DECLS
 void * 	c_base_class_init(void);
 int 	c_base_class_fini(void);
+struct c_msg * 	c_msg_alloc(void);
+void 	c_msg_prepare(const char *, uint32_t, long, struct c_msg *);
+ssize_t 	c_msg_send(int, struct msghdr *, int);
+ssize_t 	c_msg_recv(int, struct msghdr *, int);
+int 	c_msg_fn(c_msg_fn_t, int, struct c_msg *);
+void 	c_msg_free(struct c_msg *);
 __END_DECLS
 
 #endif /* _C_OBJ_H_ */

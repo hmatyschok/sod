@@ -66,7 +66,7 @@ struct ca_softc {
 	uint32_t 	sc_sock_rmt; 	/* fd, socket, applicant */
 	uint32_t 	sc_rv; 	/* tracks rv of pam(3) method calls */		
 };
-#define C_AUTHENTICATOR_SOFTC_LEN (sizeof(struct ca_softc *sc,))
+#define C_AUTHENTICATOR_LEN (sizeof(struct ca_softc *sc,))
 
 static int 	c_authenticator_conv(int, const struct pam_message **, 
 	struct pam_response **, void *);
@@ -84,10 +84,6 @@ static int 	c_authenticator_destroy(struct c_thr *);
  ******************************************************************************/
  
 static struct c_authenticator c_authenticator_methods = {
-	.ca_co = {
-		.co_id 		= C_AUTHENTICATOR,
-		.co_len 		= C_AUTHENTICATOR_LEN,
-	},
 	.ca_create 		= c_authenticator_create,
 	.ca_destroy 	= c_authenticator_destroy,
 };
@@ -95,7 +91,7 @@ static struct c_authenticator c_authenticator_methods = {
 static struct c_class c_authenticator_class = {
 	.c_obj = {
 		.c_id 		= C_AUTHENTICATOR_CLASS,
-		.c_len 		= C_AUTHENTICATOR_SOFTC_LEN,
+		.c_len 		= C_AUTHENTICATOR_LEN,
 	},
 	.c_public 		= &c_authenticator_methods,
 };
