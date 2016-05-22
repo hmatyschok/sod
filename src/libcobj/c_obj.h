@@ -37,7 +37,7 @@ typedef int 	(*c_fini_t)(void *);
 
 typedef void *	(*c_create_t)(void *);
 typedef void *	(*c_start_t)(void *);
-typedef void 	(*c_stop_t)(void *);
+typedef int 	(*c_stop_t)(void *);
 typedef int 	(*c_destroy_t)(void *, void *);
 
 /*
@@ -61,8 +61,8 @@ TAILQ_HEAD(c_obj_hd, c_obj);
  * based on db(3) API. 
  */
 struct c_cache {
-	struct c_obj_hd 	cc_hd;
-	DB 	*cc_db;
+	struct c_obj_hd 	ch_hd;
+	DB 	*ch_db;
 };
 
 /*
@@ -82,8 +82,8 @@ struct c_methods {
 	c_stop_t 		cm_stop;
 	c_destroy_t 		cm_destroy;
 };
-#define C_BASE 	1463676933
-#define C_NOP 	1463677298
+#define C_BASE_METHODS 	1463676933
+#define C_NOP_METHODS 	1463677298
 #define C_METHODS_LEN 	(sizeof(struct c_methods))
 
 /*
@@ -105,7 +105,7 @@ struct c_class {
 	void 	*c_public;
 };
 #define C_BASE_CLASS 	1463676824
-#define C_BASE_LEN 	(sizeof(structc_class))
+#define C_BASE_LEN 	(sizeof(struct c_class))
 
 /*
  * By pthread(3) covered instance.

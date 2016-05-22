@@ -26,9 +26,12 @@
  */
 
 #include <sys/types.h>
+
 #include <db.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "c_obj.h"
 
@@ -36,27 +39,28 @@
  * Set contains abstract components.
  */
 
-typedef int  	(*c_cache_fn_t)(struct c_cache *, DBT *, void *);
+typedef void *  	(*c_cache_fn_t)(struct c_cache *, DBT *, void *);
 
 static int 	c_cache_init(struct c_cache *);
+static int 	c_cache_free(struct c_cache *);
+
 static void *   c_cache_add(struct c_cache *, DBT *, void *);
 static void *   c_cache_get(struct c_cache *, DBT *, void *);
 static void *   c_cache_del(struct c_cache *, DBT *, void *);
-static int 	c_cache_free(struct c_cache *);
 
-static int 	c_cache_fn(c_cache_fn_t, struct c_cache *, void *);
+static void * 	c_cache_fn(c_cache_fn_t, struct c_cache *, void *);
 
 static void *	c_class_init(void *);
 static int 	c_class_fini(void *);
 static void * 	c_thr_create(void *);
-static void * 	c_thr_destroy(void *);
+static int 	c_thr_destroy(void *, void *);
 
 static void * 	c_nop_init(void *);
 static int 	c_nop_fini(void *);
 static void * 	c_nop_create(void *);
 static void * 	c_nop_start(void *);
-static void 	c_nop_stop(void *);
-static int 	c_nop_destroy(void *);
+static int 	c_nop_stop(void *);
+static int 	c_nop_destroy(void *, void *);
 
 /******************************************************************************
  * Generic class-attributes.
@@ -67,7 +71,7 @@ static int 	c_nop_destroy(void *);
  */ 
 static struct c_methods c_nop = {
 	.cm_co = {
-		.co_id 		= C_NOP,
+		.co_id 		= C_NOP_METHODS,
 		.co_len 		= C_METHODS_LEN,
 	},
 	.cm_init 		= c_nop_init,
@@ -88,13 +92,13 @@ static struct c_methods c_nop = {
  * and B of Sigma-algebras, where f < h.  
  */
 static struct c_class c_base_class = {
-	.c_obj = {
-		.c_id 		= C_BASE_CLASS,
-		.c_len 		= C_BASE_LEN,
+	.c_co = {
+		.co_id 		= C_BASE_CLASS,
+		.co_len 		= C_BASE_LEN,
 	},
 	.c_base = {
 		.cm_co = {
-			.co_id 		= C_BASE,
+			.co_id 		= C_BASE_METHODS,
 			.co_len 		= C_METHODS_LEN,
 		},
 		.cm_init 		= c_class_init,
@@ -228,7 +232,7 @@ c_thr_create(void *arg)
 /*
  * If successfull, then create running pthread(3) instance.
  */	
-	if (pthread_create(&thr->ct_tid, NULL, cls->c_base->cm_start, thr) != 0) 
+	if (pthread_create(&thr->ct_tid, NULL, cls->c_base.cm_start, thr) != 0) 
 		goto bad2;
 
 	(void)memcpy(&thr->ct_id, thr->ct_tid, sizeof(thr->ct_id));
@@ -244,7 +248,7 @@ out:
 bad2:	
 	(void)pthread_mutex_destroy(&thr->ct_mtx);
 bad1:
-	(void)pthread_cond_destroy(&thr->ct_cv;
+	(void)pthread_cond_destroy(&thr->ct_cv);
 bad:
 	free(thr);
 	thr = NULL;
@@ -288,7 +292,7 @@ c_thr_destroy(void *arg0, void *arg1)
  */	
 	thr = c_cache_fn(c_cache_del, &cls->c_instances, thr);
 	if (thr) {
-		eval = (*cls->c_base->cm_stop)(thr);
+		eval = (*cls->c_base.cm_stop)(thr);
 		free(thr);    
 	}
 out:		
@@ -315,7 +319,7 @@ static int
 c_nop_fini(void *arg)
 {
 
-	return (0);	
+	return (-1);	
 }
 
 /*
@@ -333,20 +337,21 @@ static void *
 c_nop_start(void *arg)
 {
 
-	return (arg);
+	return (NULL);
 }
 
-static void 	
+static int 	
 c_nop_stop(void *arg)
 {
 
+    return (-1);
 }
 
 static int 	
 c_nop_destroy(void *arg0, void *arg1)
 {
 
-	return (0);
+	return (-1);
 }
 
 /******************************************************************************
@@ -362,7 +367,7 @@ static int
 c_cache_init(struct c_cache *ch)
 {
 	if (ch == NULL)
-		return (-1)	
+		return (-1);	
 
 	if (ch->ch_db == NULL) {
 		ch->ch_db = dbopen(NULL, O_RDWR, 0, DB_HASH, NULL);
@@ -382,21 +387,23 @@ c_cache_init(struct c_cache *ch)
 static void *
 c_cache_add(struct c_cache *ch, DBT *key, void *arg)
 {	
-	struct c_obj *co;
 	DBT data;
-	
+    struct c_obj *co;
+    
 	if ((co = arg) == NULL)
 	    return (NULL);
 
 	data.data = co;
-	data.size = co->co_len);
+	data.size = co->co_len;
 	
 	if ((*ch->ch_db->put)(ch->ch_db, key, &data, 0))
 		return (NULL);
 	
-	TAILQ_INSERT_TAIL(&ch->ch_hd, data.data, c_next);
+	co = data.data;
 	
-	return (data.data);
+	TAILQ_INSERT_TAIL(&ch->ch_hd, co, co_next);
+	
+	return (co);
 }
 
 /*
@@ -405,7 +412,7 @@ c_cache_add(struct c_cache *ch, DBT *key, void *arg)
 static void * 	
 c_cache_get(struct c_cache *ch, DBT *key, void *arg __unused)
 {	
-    DBT data;
+	DBT data;
 
     (void)memset(&data, 0, sizeof(data));
 
@@ -422,7 +429,8 @@ static void *
 c_cache_del(struct c_cache *ch, DBT *key, void *arg __unused)
 {
 	DBT data;
-	
+    struct c_obj *co;
+    	
 	(void)memset(&data, 0, sizeof(data));
 	
 	if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
@@ -431,9 +439,11 @@ c_cache_del(struct c_cache *ch, DBT *key, void *arg __unused)
 	if ((*ch->ch_db->del)(ch->ch_db, key, 0))
 		return (NULL);
 		
-	TAILQ_REMOVE(&ch->ch_hd, data.data, c_next);
+	co = data.data;
 		
-	return (data.data);
+	TAILQ_REMOVE(&ch->ch_hd, co, co_next);
+		
+	return (co);
 }
 
 static void *
@@ -443,7 +453,7 @@ c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
 	DBT key;
 
 	if ((co = arg) == NULL)
-	    return (-1);
+	    return (NULL);
 	
 	key.data = &co->co_id;
 	key.size = sizeof(co->co_id);

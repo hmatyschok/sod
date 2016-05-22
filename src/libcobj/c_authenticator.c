@@ -25,21 +25,10 @@
  * version=0.2
  */
 
-#include <sys/time.h>
 
 #include <security/pam_appl.h>
 
-#include <err.h>
-#include <errno.h>
-#include <login_cap.h>
-#include <pwd.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sysexits.h>
-#include <syslog.h>
-#include <unistd.h>
-
+#include "c_obj.h"
 #include "c_authenticator.h"
 
 #define	C_AUTHENTICATOR_BACKOFF_DFLT 	3
@@ -86,7 +75,7 @@ static ca_state_fn_t 	c_authenticator_authenticate(struct ca_softc *);
 static ca_state_fn_t 	c_authenticator_establish(struct ca_softc *);
 
 static void * 	c_authenticator_start(void *); 
-static void     c_authenticator_stop(void *);
+static int     c_authenticator_stop(void *);
 static struct c_thr * 	c_authenticator_create(int, int);
 static int 	c_authenticator_destroy(struct c_thr *); 
 
@@ -511,13 +500,13 @@ out:
 /*
  * Implecitely called cleanup handler.
  */
-static void  
+static int  
 c_authenticator_stop(void *arg)
 {
 	struct ca_softc *sc = NULL;
 
 	if ((sc = arg) == NULL) 
-		return;
+		return (-1);
 
 	if (sc->sc_pamh != NULL)
 		(void)pam_end(sc->sc_pamh, sc->sc_rv);
@@ -528,4 +517,5 @@ c_authenticator_stop(void *arg)
 syslog(LOG_ERR, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */
 
+    return (0);
 }
