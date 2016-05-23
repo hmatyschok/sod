@@ -448,7 +448,7 @@ syslog(LOG_ERR, "%s\n", __func__);
 		
 				if (cnt > backoff) 
 					(*c_authenticator_class.c_base.cm_wait)
-						(sc, (u_int)((cnt - backoff) * 5));
+						((u_int)((cnt - backoff) * 5), sc);
 		
 				if (cnt >= retries)
 					ask = 0;		

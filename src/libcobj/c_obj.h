@@ -56,7 +56,7 @@ typedef int 	(*c_fini_t)(void *);
 
 typedef void *	(*c_create_t)(void *);
 typedef void *	(*c_start_t)(void *);
-typedef int     (*c_wait_t)(void *, u_int);
+typedef int     (*c_wait_t)(u_int, void *);
 typedef int 	(*c_stop_t)(void *);
 typedef int 	(*c_destroy_t)(void *, void *);
 

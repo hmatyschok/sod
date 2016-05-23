@@ -50,14 +50,14 @@ static void * 	c_cache_fn(c_cache_fn_t, struct c_cache *, void *);
 static void *	c_class_init(void *);
 static int 	c_class_fini(void *);
 static void * 	c_thr_create(void *);
-static int  c_thr_wait(void *, u_int);
+static int  c_thr_wait(u_int, void *);
 static int 	c_thr_destroy(void *, void *);
 
 static void * 	c_nop_init(void *);
 static int 	c_nop_fini(void *);
 static void * 	c_nop_create(void *);
 static void * 	c_nop_start(void *);
-static int  c_nop_wait(void *, u_int);
+static int  c_nop_wait(u_int, void *);
 static int 	c_nop_stop(void *);
 static int 	c_nop_destroy(void *, void *);
 
@@ -260,7 +260,7 @@ bad:
  * Fell asleep for ts seconds.
  */
 static int 
-c_thr_wait(void *arg, u_int ts)
+c_thr_wait(u_int ts, void *arg)
 {
 	struct c_thr *thr = NULL;
 	
@@ -378,7 +378,7 @@ c_nop_start(void *arg)
 }
 
 static int  
-c_nop_wait(void *arg, u_int ts)
+c_nop_wait(u_int ts, void *arg)
 {
 
     return (-1);
