@@ -37,6 +37,7 @@
 #include <limits.h>
 #include <pthread.h>
 
+struct c_methods;
 struct c_obj;
 
 /*
@@ -56,7 +57,14 @@ typedef int 	(*c_fini_t)(void *);
 
 typedef void *	(*c_create_t)(void *);
 typedef void *	(*c_start_t)(void *);
-typedef int     (*c_wait_t)(u_int, void *);
+
+typedef int 	(*c_lock_t)(void *);
+typedef int 	(*c_unlock_t)(void *);
+
+typedef int     (*c_sleep_t)(struct c_methods *, void *);
+typedef int     (*c_signal_t)(struct c_methods *, void *);
+typedef int     (*c_wait_t)(struct c_methods *, u_int, void *);
+
 typedef int 	(*c_stop_t)(void *);
 typedef int 	(*c_destroy_t)(void *, void *);
 
@@ -71,7 +79,8 @@ typedef int 	(*c_destroy_t)(void *, void *);
 struct c_obj {
 	long 	co_id; 	/* identifier */
 	ssize_t 	co_len;
-	
+	int         co_flags;
+#define C_LOCKED    0x00000001	
 	TAILQ_ENTRY(c_obj) co_next;
 };
 TAILQ_HEAD(c_obj_hd, c_obj);
@@ -90,8 +99,9 @@ struct c_cache {
  */
 struct c_methods {
 	struct c_obj 		cm_co;
-#define cm_id 	cm_co.co_id
-#define cm_len 	cm_co.co_len
+#define cm_id       cm_co.co_id
+#define cm_len      cm_co.co_len
+#define cm_flags    cm_co.co_flags
 	c_init_t 		cm_init;
 	c_fini_t 		cm_fini;
 /*
@@ -99,6 +109,10 @@ struct c_methods {
  */	
 	c_create_t 		cm_create;
 	c_start_t 		cm_start;
+    c_lock_t        cm_lock;
+    c_unlock_t        cm_unlock;
+    c_sleep_t        cm_sleep;    
+    c_signal_t        cm_signal;    
 	c_wait_t        cm_wait;
 	c_stop_t 		cm_stop;
 	c_destroy_t 		cm_destroy;
@@ -112,8 +126,9 @@ struct c_methods {
  */
 struct c_class {
 	struct c_obj 		c_co;
-#define c_id 	c_co.co_id
-#define c_len 	c_co.co_len
+#define c_id        c_co.co_id
+#define c_len       c_co.co_len
+#define c_flags 	c_co.co_flags
 	struct c_cache 		c_children;
 	struct c_cache 		c_instances;
 /*
@@ -133,10 +148,12 @@ struct c_class {
  */
 struct c_thr {
 	struct c_obj 	ct_co;
-#define ct_id 	ct_co.co_id
-#define ct_len 	ct_co.co_len
+#define ct_id       ct_co.co_id
+#define ct_len      ct_co.co_len
+#define ct_flags    ct_co.co_flags
+
 /*
- * Attcibutes, pthread(3).
+ * Attributes, pthread(3).
  */	
 	pthread_cond_t 	ct_cv;
 	pthread_mutex_t 	ct_mtx;

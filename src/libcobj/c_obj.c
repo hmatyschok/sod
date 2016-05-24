@@ -50,14 +50,25 @@ static void * 	c_cache_fn(c_cache_fn_t, struct c_cache *, void *);
 static void *	c_class_init(void *);
 static int 	c_class_fini(void *);
 static void * 	c_thr_create(void *);
-static int  c_thr_wait(u_int, void *);
+static int  c_thr_lock(void *);
+static int  c_thr_unlock(void *);
+static int  c_thr_signal(struct c_methods *, void *);
+static int  c_thr_sleep(struct c_methods *, void *);
+static int  c_thr_wait(struct c_methods *, u_int, void *);
 static int 	c_thr_destroy(void *, void *);
 
 static void * 	c_nop_init(void *);
 static int 	c_nop_fini(void *);
 static void * 	c_nop_create(void *);
 static void * 	c_nop_start(void *);
-static int  c_nop_wait(u_int, void *);
+
+static int  c_nop_lock(void *);
+static int  c_nop_unlock(void *);
+
+static int  c_nop_sleep(struct c_methods *, void *);
+static int  c_nop_signal(struct c_methods *, void *);
+static int  c_nop_wait(struct c_methods *, u_int, void *);
+
 static int 	c_nop_stop(void *);
 static int 	c_nop_destroy(void *, void *);
 
@@ -77,6 +88,10 @@ static struct c_methods c_nop = {
 	.cm_fini 		= c_nop_fini,
 	.cm_create 		= c_nop_create,
 	.cm_start 		= c_nop_start,
+	.cm_lock 		= c_nop_lock,	
+	.cm_unlock 		= c_nop_unlock,
+	.cm_signal       = c_nop_signal,
+	.cm_sleep       = c_nop_sleep,
 	.cm_wait        = c_nop_wait,
 	.cm_stop 		= c_nop_stop,
 	.cm_destroy 		= c_nop_destroy,
@@ -105,12 +120,145 @@ static struct c_class c_base_class = {
 		.cm_fini 		= c_class_fini,
 		.cm_create 		= c_thr_create,
 		.cm_start 		= c_nop_start,
+		.cm_lock       = c_thr_lock,
+		.cm_unlock       = c_thr_unlock,
+		.cm_sleep       = c_thr_sleep,
+		.cm_signal      = c_thr_signal,
 		.cm_wait        = c_thr_wait,
 		.cm_stop 		= c_nop_stop,
 		.cm_destroy 		= c_thr_destroy,
 	},
 	.c_public 		= &c_nop,
 };
+
+/******************************************************************************
+ * Private class-methods.
+ ******************************************************************************/
+
+/*
+ * Create in-memory hash table based db(3) 
+ * and initialize corrosponding tail queue.
+ */
+
+static int
+c_cache_init(struct c_cache *ch)
+{
+	if (ch == NULL)
+		return (-1);	
+
+	if (ch->ch_db == NULL) {
+		ch->ch_db = dbopen(NULL, O_RDWR, 0, DB_HASH, NULL);
+		
+		if (ch->ch_db == NULL)
+			return (-1);
+			
+		TAILQ_INIT(&ch->ch_hd);
+	}
+	return (0);
+}
+
+
+/*
+ * Insert object.
+ */
+static void *
+c_cache_add(struct c_cache *ch, DBT *key, void *arg)
+{	
+	DBT data;
+    struct c_obj *co;
+    
+	if ((co = arg) == NULL)
+	    return (NULL);
+
+	data.data = co;
+	data.size = co->co_len;
+	
+	if ((*ch->ch_db->put)(ch->ch_db, key, &data, 0))
+		return (NULL);
+	
+	co = data.data;
+	
+	TAILQ_INSERT_TAIL(&ch->ch_hd, co, co_next);
+	
+	return (co);
+}
+
+/*
+ * Find requested object.
+ */
+static void * 	
+c_cache_get(struct c_cache *ch, DBT *key, void *arg __unused)
+{	
+	DBT data;
+
+    (void)memset(&data, 0, sizeof(data));
+
+    if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
+        return (NULL);
+	
+	return (data.data);
+}
+
+/*
+ * Fetch requested object.
+ */
+static void * 	
+c_cache_del(struct c_cache *ch, DBT *key, void *arg __unused)
+{
+	DBT data;
+    struct c_obj *co;
+    	
+	(void)memset(&data, 0, sizeof(data));
+	
+	if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
+		return (NULL);
+	
+	if ((*ch->ch_db->del)(ch->ch_db, key, 0))
+		return (NULL);
+		
+	co = data.data;
+		
+	TAILQ_REMOVE(&ch->ch_hd, co, co_next);
+		
+	return (co);
+}
+
+static void *
+c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
+{
+	struct c_obj *co;	
+	DBT key;
+
+	if ((co = arg) == NULL)
+	    return (NULL);
+	
+	key.data = &co->co_id;
+	key.size = sizeof(co->co_id);
+	
+	return ((*fn)(ch, &key, arg));
+}
+
+/*
+ * Release by in-memory db(3) bound ressources,
+ * if all objects were released previously.
+ */
+static int
+c_cache_free(struct c_cache *ch)
+{
+	if (ch == NULL)
+		return (-1);
+
+	if (ch->ch_db) { 
+        if (!TAILQ_EMPTY(&ch->ch_hd))
+		    return (-1);
+		
+	    if ((*ch->ch_db->close)(ch->ch_db))
+		    return (-1);
+		
+	    ch->ch_db = NULL;
+	}	
+	return (0);
+}
 
 /******************************************************************************
  * Public Class-methods.
@@ -257,12 +405,93 @@ bad:
 }
 
 /*
+ * Lock instance.
+ */
+static int 
+c_thr_lock(void *arg)
+{
+	struct c_thr *thr;
+	
+	if ((thr = arg) == NULL) 
+		return (-1);
+	
+    if ((thr->ct_flags & C_LOCKED) ^ C_LOCKED) {
+        if (pthread_mutex_lock(&thr->ct_mtx))
+            return (-1);	
+	
+	    thr->ct_flags |= C_LOCKED;
+	}
+	return (0);
+}
+
+/*
+ * Unlock instance.
+ */
+static int 
+c_thr_unlock(void *arg)
+{
+	struct c_thr *thr;
+	
+	if ((thr = arg) == NULL) 
+		return (-1);
+	
+    if (thr->ct_flags & C_LOCKED) {
+        if (pthread_mutex_unlock(&thr->ct_mtx))
+            return (-1);	
+	
+	    thr->ct_flags &= ~C_LOCKED;
+	}
+	return (0);
+}
+
+/*
+ * Fell asleep.
+ */
+static int 
+c_thr_sleep(struct c_methods *cm0, void *arg)
+{
+	struct c_thr *thr;
+	struct c_methods *cm;
+	
+	if ((thr = arg) == NULL) 
+		return (-1);
+	
+    cm = (cm0 == NULL) ? &c_base_class.c_base : cm0;
+    
+    (void)(*cm->cm_lock)(arg);
+	(void)pthread_cond_wait(&thr->ct_cv, &thr->ct_mtx);
+
+	return (0);
+}
+
+/*
+ * Continue stalled pthred(3) execution.
+ */ 
+static int 
+c_thr_signal(struct c_methods *cm0, void *arg)
+{
+	struct c_thr *thr;
+	struct c_methods *cm;
+	
+	if ((thr = arg) == NULL) 
+		return (-1);
+	
+    cm = (cm0 == NULL) ? &c_base_class.c_base : cm0;
+    
+	(void)pthread_cond_signal(&thr->ct_cv);
+    (void)(*cm->cm_unlock)(arg);
+
+	return (0);
+}
+
+/*
  * Fell asleep for ts seconds.
  */
 static int 
-c_thr_wait(u_int ts, void *arg)
+c_thr_wait(struct c_methods *cm0, u_int ts, void *arg)
 {
-	struct c_thr *thr = NULL;
+	struct c_thr *thr;
+	struct c_methods *cm;
 	
 	u_int uts;	
 	
@@ -273,10 +502,10 @@ c_thr_wait(u_int ts, void *arg)
 	if ((thr = arg) == NULL) 
 		goto out;
 	
+	cm = (cm0 == NULL) ? &c_base_class.c_base : cm0;
+	
 	if ((uts = (ts * 1000)) == 0)
 		goto out;
-	
-/* ... */
 	
 	while (eval < 0)
 		eval = gettimeofday(&x, NULL);
@@ -284,9 +513,11 @@ c_thr_wait(u_int ts, void *arg)
 	ttw.tv_sec = x.tv_sec + ts;
 	ttw.tv_nsec = (x.tv_usec + uts) * 1000UL;
 	
+	(void)(*cm->cm_lock)(arg);
+	
 	eval = pthread_cond_timedwait(&thr->ct_cv, &thr->ct_mtx, &ttw);
 
-/* ... */
+    (void)(*cm->cm_unlock)(arg);
 
 out:	
 	return (eval);
@@ -377,8 +608,37 @@ c_nop_start(void *arg)
 	return (NULL);
 }
 
+static int 	
+c_nop_lock(void *arg)
+{
+
+    return (-1);
+}
+
+static int 	
+c_nop_unlock(void *arg)
+{
+
+    return (-1);
+}
+
+static int 	
+c_nop_sleep(struct c_methods *cm, void *arg)
+{
+
+    return (-1);
+}
+
+static int 	
+c_nop_signal(struct c_methods *cm, void *arg)
+{
+
+    return (-1);
+}
+
+
 static int  
-c_nop_wait(u_int ts, void *arg)
+c_nop_wait(struct c_methods *cm, u_int ts, void *arg)
 {
 
     return (-1);
@@ -398,133 +658,4 @@ c_nop_destroy(void *arg0, void *arg1)
 	return (-1);
 }
 
-/******************************************************************************
- * Subr.
- ******************************************************************************/
 
-/*
- * Create in-memory hash table based db(3) 
- * and initialize corrosponding tail queue.
- */
-
-static int
-c_cache_init(struct c_cache *ch)
-{
-	if (ch == NULL)
-		return (-1);	
-
-	if (ch->ch_db == NULL) {
-		ch->ch_db = dbopen(NULL, O_RDWR, 0, DB_HASH, NULL);
-		
-		if (ch->ch_db == NULL)
-			return (-1);
-			
-		TAILQ_INIT(&ch->ch_hd);
-	}
-	return (0);
-}
-
-
-/*
- * Insert object.
- */
-static void *
-c_cache_add(struct c_cache *ch, DBT *key, void *arg)
-{	
-	DBT data;
-    struct c_obj *co;
-    
-	if ((co = arg) == NULL)
-	    return (NULL);
-
-	data.data = co;
-	data.size = co->co_len;
-	
-	if ((*ch->ch_db->put)(ch->ch_db, key, &data, 0))
-		return (NULL);
-	
-	co = data.data;
-	
-	TAILQ_INSERT_TAIL(&ch->ch_hd, co, co_next);
-	
-	return (co);
-}
-
-/*
- * Find requested object.
- */
-static void * 	
-c_cache_get(struct c_cache *ch, DBT *key, void *arg __unused)
-{	
-	DBT data;
-
-    (void)memset(&data, 0, sizeof(data));
-
-    if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
-        return (NULL);
-	
-	return (data.data);
-}
-
-/*
- * Fetch requested object.
- */
-static void * 	
-c_cache_del(struct c_cache *ch, DBT *key, void *arg __unused)
-{
-	DBT data;
-    struct c_obj *co;
-    	
-	(void)memset(&data, 0, sizeof(data));
-	
-	if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
-		return (NULL);
-	
-	if ((*ch->ch_db->del)(ch->ch_db, key, 0))
-		return (NULL);
-		
-	co = data.data;
-		
-	TAILQ_REMOVE(&ch->ch_hd, co, co_next);
-		
-	return (co);
-}
-
-static void *
-c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
-{
-	struct c_obj *co;	
-	DBT key;
-
-	if ((co = arg) == NULL)
-	    return (NULL);
-	
-	key.data = &co->co_id;
-	key.size = sizeof(co->co_id);
-	
-	return ((*fn)(ch, &key, arg));
-}
-
-/*
- * Release by in-memory db(3) bound ressources,
- * if all objects were released previously.
- */
-static int
-c_cache_free(struct c_cache *ch)
-{
-	if (ch == NULL)
-		return (-1);
-
-	if (ch->ch_db == NULL) 
-		return (-1);
-		
-	if (!TAILQ_EMPTY(&ch->ch_hd))
-		return (-1);
-		
-	if ((*ch->ch_db->close)(ch->ch_db))
-		return (-1);
-		
-	ch->ch_db = NULL;
-		
-	return (0);
-}

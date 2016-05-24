@@ -175,7 +175,7 @@ c_authenticator_create(int sock_srv, int sock_rmt)
 /*
  * Release stalled execution.
  */		
-		(void)pthread_cond_signal(&thr->ct_cv);
+		(void)(*cm->cm_signal)(cm, thr);
 	} else
 		thr = NULL;
 	return (thr);
@@ -303,21 +303,23 @@ syslog(LOG_ERR, "%s: rx: %s\n", __func__, sc->sc_buf.msg_tok);
 static void *
 c_authenticator_start(void *arg)
 {
-	ca_state_t fn = NULL;
+	struct c_class *this;
+	struct c_methods *cm;
+	ca_state_t fn;
 	struct ca_softc *sc;
+	
+    this = &c_authenticator_class;
+	cm = &this->c_base;
+	fn = NULL;
 	
 	if ((sc = arg) == NULL)
 		goto out;
 	
-	(void)pthread_mutex_lock(&sc->sc_thr.ct_mtx);
-	
-	if (pthread_cond_wait(&sc->sc_thr.ct_cv, &sc->sc_thr.ct_mtx) == 0)
+	if ((*cm->cm_sleep)(cm, &sc->sc_thr) == 0)
 		fn = (ca_state_t)c_authenticator_establish;	
 	
 	while (fn != NULL)
 		fn = (ca_state_t)(*fn)(sc);
-		
-	(void)pthread_mutex_unlock(&sc->sc_thr.ct_mtx);
 out:	
 	return (arg);
 }	
@@ -370,13 +372,20 @@ out:
 static ca_state_fn_t  
 c_authenticator_authenticate(void *arg)
 {	
-	ca_state_fn_t state = NULL;
-	login_cap_t *lc = NULL;
+	struct c_class *this;
+	struct c_methods *cm;
+	ca_state_fn_t state;
+	login_cap_t *lc;
 	struct ca_softc *sc;
 	int retries, backoff;
 	int ask = 0, cnt = 0;
 	uint32_t resp;
 
+    this = &c_authenticator_class;
+	cm = &this->c_base;
+    state = NULL;
+	lc = NULL;
+	
 	if ((sc = arg) == NULL)
 		goto out;
 
@@ -447,8 +456,8 @@ syslog(LOG_ERR, "%s\n", __func__);
 				cnt += 1;	
 		
 				if (cnt > backoff) 
-					(*c_authenticator_class.c_base.cm_wait)
-						((u_int)((cnt - backoff) * 5), sc);
+					(*cm->cm_wait)
+					    (cm, (u_int)((cnt - backoff) * 5), sc);
 		
 				if (cnt >= retries)
 					ask = 0;		
