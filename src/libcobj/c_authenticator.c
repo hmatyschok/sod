@@ -81,6 +81,7 @@ static void * 	c_authenticator_start(void *);
 static int     c_authenticator_stop(void *);
 
 static struct c_thr * 	c_authenticator_create(int, int);
+static int 	c_authenticator_join(struct c_thr *);
 static int 	c_authenticator_destroy(struct c_thr *); 
 
 /******************************************************************************
@@ -89,6 +90,7 @@ static int 	c_authenticator_destroy(struct c_thr *);
  
 static struct c_authenticator c_authenticator_methods = {
 	.ca_create 		= c_authenticator_create,
+	.ca_join        = c_authenticator_join,
 	.ca_destroy 	= c_authenticator_destroy,
 };
 
@@ -175,10 +177,21 @@ c_authenticator_create(int sock_srv, int sock_rmt)
 /*
  * Release stalled execution.
  */		
-		(void)(*cm->cm_signal)(cm, thr);
+		(void)(*cm->cm_wakeup)(cm, thr);
 	} else
 		thr = NULL;
 	return (thr);
+}
+
+/*
+ * Wrapper suspeds execution of calling pthread(3).
+ */
+static int 
+c_authenticator_join(struct c_thr *thr) 
+{
+    void *arg = NULL;
+	
+	return (pthread_join(thr->ct_tid, &arg));
 }
 
 /*

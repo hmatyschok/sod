@@ -30,7 +30,7 @@ NO_MAN=
 PROG=	sod
 SRCS=	sod.c
 
-LDADD=	-lsod
+LDADD=	-lcobj
 
 .include <bsd.prog.mk>
 

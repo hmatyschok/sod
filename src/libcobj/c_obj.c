@@ -33,10 +33,10 @@
 #include "c_obj.h"
 
 /*
- * Set contains abstract components.
+ * Implements abstract class.
  */
 
-typedef void *  	(*c_cache_fn_t)(struct c_cache *, DBT *, void *);
+typedef void *  (*c_cache_fn_t)(struct c_cache *, DBT *, void *);
 
 static int 	c_cache_init(struct c_cache *);
 static int 	c_cache_free(struct c_cache *);
@@ -52,7 +52,7 @@ static int 	c_class_fini(void *);
 static void * 	c_thr_create(void *);
 static int  c_thr_lock(void *);
 static int  c_thr_unlock(void *);
-static int  c_thr_signal(struct c_methods *, void *);
+static int  c_thr_wakeup(struct c_methods *, void *);
 static int  c_thr_sleep(struct c_methods *, void *);
 static int  c_thr_wait(struct c_methods *, u_int, void *);
 static int 	c_thr_destroy(void *, void *);
@@ -66,7 +66,7 @@ static int  c_nop_lock(void *);
 static int  c_nop_unlock(void *);
 
 static int  c_nop_sleep(struct c_methods *, void *);
-static int  c_nop_signal(struct c_methods *, void *);
+static int  c_nop_wakeup(struct c_methods *, void *);
 static int  c_nop_wait(struct c_methods *, u_int, void *);
 
 static int 	c_nop_stop(void *);
@@ -90,7 +90,7 @@ static struct c_methods c_nop = {
 	.cm_start 		= c_nop_start,
 	.cm_lock 		= c_nop_lock,	
 	.cm_unlock 		= c_nop_unlock,
-	.cm_signal       = c_nop_signal,
+	.cm_wakeup       = c_nop_wakeup,
 	.cm_sleep       = c_nop_sleep,
 	.cm_wait        = c_nop_wait,
 	.cm_stop 		= c_nop_stop,
@@ -123,7 +123,7 @@ static struct c_class c_base_class = {
 		.cm_lock       = c_thr_lock,
 		.cm_unlock       = c_thr_unlock,
 		.cm_sleep       = c_thr_sleep,
-		.cm_signal      = c_thr_signal,
+		.cm_wakeup      = c_thr_wakeup,
 		.cm_wait        = c_thr_wait,
 		.cm_stop 		= c_nop_stop,
 		.cm_destroy 		= c_thr_destroy,
@@ -136,7 +136,7 @@ static struct c_class c_base_class = {
  ******************************************************************************/
 
 /*
- * Create in-memory hash table based db(3) 
+ * Create in-memory db(3) based on hash table 
  * and initialize corrosponding tail queue.
  */
 
@@ -468,7 +468,7 @@ c_thr_sleep(struct c_methods *cm0, void *arg)
  * Continue stalled pthred(3) execution.
  */ 
 static int 
-c_thr_signal(struct c_methods *cm0, void *arg)
+c_thr_wakeup(struct c_methods *cm0, void *arg)
 {
 	struct c_thr *thr;
 	struct c_methods *cm;
@@ -630,7 +630,7 @@ c_nop_sleep(struct c_methods *cm, void *arg)
 }
 
 static int 	
-c_nop_signal(struct c_methods *cm, void *arg)
+c_nop_wakeup(struct c_methods *cm, void *arg)
 {
 
     return (-1);

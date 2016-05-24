@@ -31,11 +31,14 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 
 #include <db.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <pthread.h>
+
+#define C_NMAX 	127
 
 struct c_methods;
 struct c_obj;
@@ -50,8 +53,6 @@ struct c_obj;
 
 typedef ssize_t 	(*c_msg_fn_t)(int, struct msghdr *, int);
 
-#define C_NMAX 	127
-
 typedef void * 	(*c_init_t)(void *);
 typedef int 	(*c_fini_t)(void *);
 
@@ -62,7 +63,7 @@ typedef int 	(*c_lock_t)(void *);
 typedef int 	(*c_unlock_t)(void *);
 
 typedef int     (*c_sleep_t)(struct c_methods *, void *);
-typedef int     (*c_signal_t)(struct c_methods *, void *);
+typedef int     (*c_wakeup_t)(struct c_methods *, void *);
 typedef int     (*c_wait_t)(struct c_methods *, u_int, void *);
 
 typedef int 	(*c_stop_t)(void *);
@@ -112,7 +113,7 @@ struct c_methods {
     c_lock_t        cm_lock;
     c_unlock_t        cm_unlock;
     c_sleep_t        cm_sleep;    
-    c_signal_t        cm_signal;    
+    c_wakeup_t        cm_wakeup;    
 	c_wait_t        cm_wait;
 	c_stop_t 		cm_stop;
 	c_destroy_t 		cm_destroy;

@@ -21,15 +21,13 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * version=0.2
  */
 
 #include <sys/stat.h>
 
-#include <err.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <limits.h>
-#include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -40,6 +38,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#include <c_obj.h>
 #include <c_authenticator.h>
 
 /*
@@ -57,9 +56,9 @@ static struct c_authenticator *ca;
 
 static char *cmd; 
 
-static const char *work_dir = SOD_WORK_DIR;
-static const char *pid_file = SOD_PID_FILE;
-static const char *sock_file = SOD_SOCK_FILE;
+static char *work_dir = SOD_WORK_DIR;
+static char *pid_file = SOD_PID_FILE;
+static char *sock_file = SOD_SOCK_FILE;
 
 static char 	lock_file[PATH_MAX + 1];
 static struct sockaddr_storage 	sap;
@@ -106,13 +105,13 @@ sod_atexit(void)
 static void *
 sod_sigaction(void *arg)
 {
-	sigset_t sigset
+	sigset_t sigset;
 	int sig;
 	
 	if (sigfillset(&sigset) < 0)
 		sod_errx(EX_OSERR, "Can't initialize signal set");
 
-	if (pthread_sigmask(SIG_BLOCK, &sisgset, NULL) != 0)
+	if (pthread_sigmask(SIG_BLOCK, &sigset, NULL) != 0)
 		sod_errx(EX_OSERR, "Can't apply modefied signal set");
 			
 	for (;;) {
@@ -142,7 +141,7 @@ main(int argc, char **argv)
 	struct sigaction sa;
 	struct sockaddr_un *sun;
 	size_t len;
-	int fd , flags;
+	int fd;
 	
 	if (getuid() != 0)
 		sod_errx(EX_NOPERM, "%s", strerror(EPERM));	 
@@ -153,7 +152,6 @@ main(int argc, char **argv)
 	cmd = argv[fd];
 	
 	openlog(cmd, LOG_CONS, LOG_DAEMON);
-	flags = SOD_SYSLOG;	
 /*
  * Disable hang-up signal.
  */
@@ -238,7 +236,7 @@ main(int argc, char **argv)
 	if (bind(fd, (struct sockaddr *)sun, len) < 0)
 		sod_errx(EX_OSERR, "Can't bind %s", sun->sun_path);	
 
-	if (listen(fd, SOD_QLEN) < 0) 
+	if (listen(fd, C_MSG_QLEN) < 0) 
 		sod_errx(EX_OSERR, "Can't listen %s", sun->sun_path);
 /*
  * Fetch interface from c_authenticator_class.
@@ -257,7 +255,7 @@ main(int argc, char **argv)
 			continue;
 		
 		if ((thr = (*ca->ca_create)(fd, rmt)) != NULL) {
-			(void)pthread_join(thr->c_tid);
+			(void)(*ca->ca_join)(thr);
 			(void)(*ca->ca_destroy)(thr);	
 		}
 	}
