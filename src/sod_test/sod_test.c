@@ -21,14 +21,13 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * version=0.2
  */
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 
 #include <err.h>
-#include <pthread.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,19 +35,24 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#include <c_obj.h>
+#include <c_authenticator.h>
+
 /*
  * Simple test.
  */
  
-#include <c_authenticator.h>
+#define SOD_SOCK_FILE 	"/var/run/sod.sock"
 
 struct sod_test_args {
     char 	sta_user[C_NMAX + 1];
     char 	sta_pw[C_NMAX + 1];
 };
 
-static const int 	max_arg = 3;
-static const char 	*sock_file = SOD_SOCK_FILE;
+static int 	max_arg = 3;
+static char 	*sock_file = SOD_SOCK_FILE;
+
+static char     cmd[C_NMAX + 1];
 
 static struct sockaddr_storage 	sap;
 static struct sockaddr_un *sun;
@@ -77,7 +81,7 @@ sod_test(void *arg)
 		goto bad;
 	
 	if (connect(s, (struct sockaddr *)sun, len) < 0)
-		goto bad1
+		goto bad1;
 		
 	if ((buf = c_msg_alloc()) == NULL)
 	    goto bad2;
@@ -99,7 +103,7 @@ sod_test(void *arg)
 /*
  * Send message.
  */ 		
-			if (c_msg_handle(c_msg_send, s, buf) < 0) {
+			if (c_msg_fn(c_msg_send, s, buf) < 0) {
 				syslog(LOG_ERR, 
 					"Can't send PAM_USER as request\n");
 				state = 0;
@@ -111,7 +115,7 @@ sod_test(void *arg)
 /*
  * Await response.
  */			
-			if (c_msg_handle(c_msg_recv, s, buf) < 0) {
+			if (c_msg_fn(c_msg_recv, s, buf) < 0) {
 				syslog(LOG_ERR, 
 					"Can't receive "
 					"C_AUTHENTICATOR_AUTH_NAK "
@@ -120,7 +124,7 @@ sod_test(void *arg)
 				break;
 			}
 			
-			if (tok == user) {
+			if (tok == sta->sta_user) {
 /*
  * Cache for conversation need credentials.
  */
@@ -187,7 +191,7 @@ main(int argc, char **argv)
 	if (sigaction(SIGCHLD, &sa, NULL) < 0)
 		errx(EX_OSERR, "Can't disable SIGCHLD");
 
-	(void)strncpy(cmd, argv[i++], C_NMAX);
+	(void)strncpy(cmd, argv[0], C_NMAX);
 		
 	if (argc != max_arg)
 		errx(EX_USAGE, "\nusage: %s user pw\n", argv[0]);

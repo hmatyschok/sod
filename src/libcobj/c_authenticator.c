@@ -39,6 +39,12 @@
 #include "c_obj.h"
 #include "c_authenticator.h"
 
+#define	C_AUTHENTICATOR_BACKOFF_DFLT 	3
+#define	C_AUTHENTICATOR_RETRIES_DFLT 	10
+
+#define	C_AUTHENTICATOR_PROMPT_DFLT		"login: "
+#define	C_AUTHENTICATOR_PW_PROMPT_DFLT	"Password:"
+
 /*
  * Recursively defined callback function. 
  */

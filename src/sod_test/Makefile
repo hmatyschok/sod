@@ -22,14 +22,14 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# version=0.1
+# version=0.2
 
 NO_MAN=
 
 PROG=	sod_test
 SRCS=	sod_test.c
 
-LDADD=	-lsod
+LDADD=	-lcobj
 
 .include <bsd.prog.mk>
 

@@ -61,7 +61,10 @@ static char *pid_file = SOD_PID_FILE;
 static char *sock_file = SOD_SOCK_FILE;
 
 static char 	lock_file[PATH_MAX + 1];
+
 static struct sockaddr_storage 	sap;
+static struct sockaddr_un *sun;
+static size_t len;
 
 static struct c_class *root;
 
@@ -139,8 +142,6 @@ int
 main(int argc, char **argv)
 {
 	struct sigaction sa;
-	struct sockaddr_un *sun;
-	size_t len;
 	int fd;
 	
 	if (getuid() != 0)
@@ -149,7 +150,7 @@ main(int argc, char **argv)
 	if ((fd = open(pid_file, O_RDWR, 0640)) > -1) 
 		sod_errx(EX_OSERR, "Daemon already running");	
 		
-	cmd = argv[fd];
+	cmd = argv[0];
 	
 	openlog(cmd, LOG_CONS, LOG_DAEMON);
 /*
