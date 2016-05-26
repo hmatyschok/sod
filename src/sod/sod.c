@@ -66,7 +66,7 @@ static struct sockaddr_storage 	sap;
 static struct sockaddr_un *sun;
 static size_t len;
 
-static struct timeval x;
+static sigset_t signalset;
 
 static void 	sod_errx(int, const char *, ...);
 static void 	sod_atexit(void);
@@ -133,6 +133,12 @@ main(int argc, char **argv)
 
 	if (sigaction(SIGHUP, &sa, NULL) < 0)
 		sod_errx(EX_OSERR, "Can't disable SIGHUP");
+	
+    if (sigfillset(&signalset) < 0)
+		sod_errx(EX_OSERR, "Can't initialize signal set");
+
+	if (pthread_sigmask(SIG_BLOCK, &signalset, NULL) != 0)
+		sod_errx(EX_OSERR, "Can't apply modefied signal set");	
 	
 	if (pthread_create(&tid, NULL, sod_sigaction, NULL) != 0)
 		sod_errx(EX_OSERR, "Can't initialize signal handler");
@@ -206,17 +212,10 @@ main(int argc, char **argv)
 static void *
 sod_sigaction(void *arg)
 {
-	sigset_t sigset;
 	int sig;
 	
-	if (sigfillset(&sigset) < 0)
-		sod_errx(EX_OSERR, "Can't initialize signal set");
-
-	if (pthread_sigmask(SIG_BLOCK, &sigset, NULL) != 0)
-		sod_errx(EX_OSERR, "Can't apply modefied signal set");
-			
 	for (;;) {
-		if (sigwait(&sigset, &sig) != 0)
+		if (sigwait(&signalset, &sig) != 0)
 			sod_errx(EX_OSERR, "Can't select signal set");
 
 		switch (sig) {

@@ -26,8 +26,7 @@
 
 .include <bsd.own.mk>
 
-SUBDIR= libcobj \
-	sod \
+SUBDIR= sod \
 	sod_test 
 
 .include <bsd.subdir.mk>
