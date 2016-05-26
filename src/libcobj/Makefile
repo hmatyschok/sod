@@ -36,11 +36,11 @@ SHLIB_MINOR=0
 SRCS=	c_obj.c \
 		c_msg.c \
 		c_authenticator.c \
-		c_sigaction.c 
+		c_sigset.c 
 
 INCS=	c_obj.h \
 		c_authenticator.h \
-		c_sigaction.h
+		c_sigset.h
 
 WARNS?=	3
 

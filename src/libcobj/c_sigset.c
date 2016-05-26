@@ -31,44 +31,44 @@
 #include <sysexits.h>
 
 #include "c_obj.h"
-#include "c_sigaction.h"
+#include "c_sigset.h"
 
 /*
  * Component, performs signal handling.
  */
 
-struct c_sigaction_softc {
+struct c_sigset_softc {
 	struct c_thr 	sc_thr; 	/* binding, pthread(3) */
 #define sc_id 	sc_thr.ct_co.co_id
 #define sc_len 	sc_thr.ct_co.co_len	
 	sigset_t    sc_sigset;		
 };
-#define C_SIGACTION_CLASS 	1464266531
-#define C_SIGACTION_LEN (sizeof(struct c_sigaction_softc))
+#define C_SIGSET_CLASS 	1464266531
+#define C_SIGSET_LEN (sizeof(struct c_sigset_softc))
 
-static void * 	c_sigaction_start(void *); 
-static int     c_sigaction_stop(void *);
+static void * 	c_sigset_start(void *); 
+static int     c_sigset_stop(void *);
 
-static void * 	c_sigaction_create(void);
-static int 	c_sigaction_add(int, void *);
-static int 	c_sigaction_destroy(void *); 
+static void * 	c_sigset_create(void);
+static int 	c_sigset_add(int, void *);
+static int 	c_sigset_destroy(void *); 
 
 /******************************************************************************
  * Class-attributes.
  ******************************************************************************/
  
-static struct c_sigaction c_sigaction_methods = {
-	.c_sigaction_create 		= c_sigaction_create,
-	.c_sigaction_add        = c_sigaction_add,
-	.c_sigaction_destroy 	= c_sigaction_destroy,
+static struct c_sigset c_sigset_methods = {
+	.c_sigset_create 		= c_sigset_create,
+	.c_sigset_add        = c_sigset_add,
+	.c_sigset_destroy 	= c_sigset_destroy,
 };
 
-static struct c_class c_sigaction_class = {
+static struct c_class c_sigset_class = {
 	.c_co = {
-		.co_id 		= C_SIGACTION_CLASS,
-		.co_len 		= C_SIGACTION_LEN,
+		.co_id 		= C_SIGSET_CLASS,
+		.co_len 		= C_SIGSET_LEN,
 	},
-	.c_public 		= &c_sigaction_methods,
+	.c_public 		= &c_sigset_methods,
 };
 
 /******************************************************************************
@@ -79,13 +79,13 @@ static struct c_class c_sigaction_class = {
  * Initialize class properties and return public interface.
  */
  
-struct c_sigaction * 
-c_sigaction_class_init(void)
+struct c_sigset * 
+c_sigset_class_init(void)
 {
 	struct c_class *this;
 	struct c_methods *cm;
 
-	this = &c_sigaction_class;
+	this = &c_sigset_class;
 
 	if ((cm = c_base_class_init()) == NULL)
 		return (NULL);
@@ -93,8 +93,8 @@ c_sigaction_class_init(void)
 	if ((cm = (*cm->cm_init)(this)) == NULL)
 		return (NULL);
 
-	cm->cm_start = c_sigaction_start;
-	cm->cm_stop = c_sigaction_stop;
+	cm->cm_start = c_sigset_start;
+	cm->cm_stop = c_sigset_stop;
 	
 	return (this->c_public);	
 }
@@ -104,12 +104,12 @@ c_sigaction_class_init(void)
  */
 
 int  
-c_sigaction_class_fini(void)
+c_sigset_class_fini(void)
 {
 	struct c_class *this;
 	struct c_methods *cm;
 
-	this = &c_sigaction_class;
+	this = &c_sigset_class;
 	cm = &this->c_base;
 	
 	return ((*cm->cm_fini)(this));	
@@ -123,13 +123,13 @@ c_sigaction_class_fini(void)
  * Ctor.
  */
 static void *
-c_sigaction_create(void) 
+c_sigset_create(void) 
 {
 	struct c_class *this;
 	struct c_methods *cm;
-	struct c_sigaction_softc *sc;
+	struct c_sigset_softc *sc;
 
-	this = &c_sigaction_class;
+	this = &c_sigset_class;
 	cm = &this->c_base;
 	
 	if ((sc = (*cm->cm_create)(this)) == NULL)
@@ -146,16 +146,16 @@ c_sigaction_create(void)
  * Add signal on sigset.
  */
 static int 
-c_sigaction_add(int how, void *arg) 
+c_sigset_add(int how, void *arg) 
 { 
     struct c_thr *thr;
     struct c_class *this;
-    struct c_sigaction_softc *sc;
+    struct c_sigset_softc *sc;
 	
 	if ((thr = arg) == NULL)
 	    return (-1);
     
-	this = &c_sigaction_class;
+	this = &c_sigset_class;
 	sc = c_cache_fn(c_cache_get, &this->c_instances, thr);
 	
 	if (sc == NULL)
@@ -177,13 +177,13 @@ c_sigaction_add(int how, void *arg)
  * Dtor.
  */
 static int 
-c_sigaction_destroy(void *arg) 
+c_sigset_destroy(void *arg) 
 {
 	struct c_thr *thr;
 	struct c_class *this;
 	struct c_methods *cm;
 	
-	this = &c_sigaction_class;
+	this = &c_sigset_class;
 	cm = &this->c_base;
 	
 	return ((*cm->cm_destroy)(this, thr));
@@ -197,9 +197,9 @@ c_sigaction_destroy(void *arg)
  * By pthread_create(3) called start_routine.
  */
 static void *
-c_sigaction_start(void *arg)
+c_sigset_start(void *arg)
 {
-    struct c_sigaction_softc *sc;
+    struct c_sigset_softc *sc;
 	int sig;
 	
 	if ((sc = arg) == NULL)
@@ -228,7 +228,7 @@ out:
  * Implecitely called cleanup handler.
  */
 static int  
-c_sigaction_stop(void *arg)
+c_sigset_stop(void *arg)
 {
 
     return (0);
