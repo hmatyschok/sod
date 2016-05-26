@@ -94,6 +94,11 @@ main(int argc, char **argv)
  */
 	if (signal(SIGHUP, SIG_IGN) < 0)
 		sod_errx(EX_OSERR, "Can't disable SIGHUP");
+/*
+ * Avoid creation of zombie processes.
+ */
+	if (signal(SIGCHLD, SIG_IGN) < 0)
+		sod_errx(EX_OSERR, "Can't disable SIGCHLD");
 
 	if ((pid = fork()) < 0) 
 		sod_errx(EX_OSERR, "Can't fork");
