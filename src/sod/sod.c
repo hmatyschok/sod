@@ -78,7 +78,6 @@ static void *	sod_sigaction(void *);
 int
 main(int argc, char **argv)
 {
-	struct sigaction sa;
 	int fd;
 	
 	if (getuid() != 0)
@@ -93,11 +92,7 @@ main(int argc, char **argv)
 /*
  * Disable hang-up signal.
  */
-	sa.sa_handler = SIG_IGN;
-	(void)sigemptyset(&sa.sa_mask);
-	sa.sa_flags = 0;
-
-	if (sigaction(SIGHUP, &sa, NULL) < 0)
+	if (signal(SIGHUP, SIG_IGN) < 0)
 		sod_errx(EX_OSERR, "Can't disable SIGHUP");
 
 	if ((pid = fork()) < 0) 
@@ -125,15 +120,9 @@ main(int argc, char **argv)
 /* 
  * Modefy signal handling.
  */ 
-	sa.sa_handler = SIG_IGN;
-	
-	(void)sigemptyset(&sa.sa_mask);
-	
-	sa.sa_flags = 0;
-
-	if (sigaction(SIGHUP, &sa, NULL) < 0)
+	if (signal(SIGHUP, SIG_IGN) < 0)
 		sod_errx(EX_OSERR, "Can't disable SIGHUP");
-	
+		
     if (sigfillset(&signalset) < 0)
 		sod_errx(EX_OSERR, "Can't initialize signal set");
 

@@ -35,6 +35,8 @@
 
 /*
  * Component, performs signal handling.
+ *
+ * XXX: under construction...
  */
 
 struct c_signal_softc {
@@ -136,6 +138,9 @@ c_signal_create(void)
 	if ((sc = (*cm->cm_create)(this)) == NULL)
 	    goto bad;
 	
+	if (sigemptyset(&sc->sc_sigaction.sa_mask) < 0)
+	    goto bad1;
+	
 	if (sigfillset(&sc->sc_sigset) < 0)
 	    goto bad1;
 	
@@ -147,7 +152,7 @@ bad:
 }
 
 /*
- * Add signal on signal.
+ * Add signal on sigset.
  */
 static int 
 c_signal_add(int how, void *arg) 
