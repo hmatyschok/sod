@@ -25,10 +25,10 @@
 #
 # version=0.2
 
-NO_MAN=
 
 PROG=	sod
 SRCS=	sod.c
+MAN=    sod.8
 
 LDADD=	-lcobj
 
