@@ -456,7 +456,7 @@ c_thr_sleep(struct c_methods *cm0, void *arg)
 	if ((thr = arg) == NULL) 
 		return (-1);
 	
-    cm = (cm0 == NULL) ? &c_base_class.c_base : cm0;
+    cm = (cm0) ? cm0 : &c_base_class.c_base;
     
     (void)(*cm->cm_lock)(arg);
 	(void)pthread_cond_wait(&thr->ct_cv, &thr->ct_mtx);
@@ -465,7 +465,7 @@ c_thr_sleep(struct c_methods *cm0, void *arg)
 }
 
 /*
- * Continue stalled pthred(3) execution.
+ * Continue stalled pthread(3) execution.
  */ 
 static int 
 c_thr_wakeup(struct c_methods *cm0, void *arg)
@@ -476,7 +476,7 @@ c_thr_wakeup(struct c_methods *cm0, void *arg)
 	if ((thr = arg) == NULL) 
 		return (-1);
 	
-    cm = (cm0 == NULL) ? &c_base_class.c_base : cm0;
+    cm = (cm0) ? cm0 : &c_base_class.c_base;
     
 	(void)pthread_cond_signal(&thr->ct_cv);
     (void)(*cm->cm_unlock)(arg);
@@ -502,23 +502,21 @@ c_thr_wait(struct c_methods *cm0, u_int ts, void *arg)
 	if ((thr = arg) == NULL) 
 		goto out;
 	
-	cm = (cm0 == NULL) ? &c_base_class.c_base : cm0;
-	
 	if ((uts = (ts * 1000)) == 0)
 		goto out;
 	
-	while (eval < 0)
-		eval = gettimeofday(&x, NULL);
+	cm = (cm0) ? cm0 : &c_base_class.c_base;
 	
-	ttw.tv_sec = x.tv_sec + ts;
-	ttw.tv_nsec = (x.tv_usec + uts) * 1000UL;
+	if ((eval = gettimeofday(&x, NULL)) == 0) {
+	    (void)(*cm->cm_lock)(arg);
 	
-	(void)(*cm->cm_lock)(arg);
+	    ttw.tv_sec = x.tv_sec + ts;
+	    ttw.tv_nsec = (x.tv_usec + uts) * 1000UL;
 	
-	eval = pthread_cond_timedwait(&thr->ct_cv, &thr->ct_mtx, &ttw);
+	    eval = pthread_cond_timedwait(&thr->ct_cv, &thr->ct_mtx, &ttw);
 
-    (void)(*cm->cm_unlock)(arg);
-
+        (void)(*cm->cm_unlock)(arg);
+    }
 out:	
 	return (eval);
 }

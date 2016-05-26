@@ -66,74 +66,11 @@ static struct sockaddr_storage 	sap;
 static struct sockaddr_un *sun;
 static size_t len;
 
-static struct c_class *root;
+static struct timeval x;
 
 static void 	sod_errx(int, const char *, ...);
 static void 	sod_atexit(void);
 static void *	sod_sigaction(void *);
-
-/*
- * Abnormal process termination.
- */
-static void 	
-sod_errx(int eval, const char *fmt, ...)
-{
-	va_list ap;
-	
-	va_start(ap, fmt);
-	vsyslog(LOG_ERR, fmt, ap);
-	va_end(ap);	
-	exit(eval);
-}
-
-/*
- * byr atextit(3) registered cleanup handler. 
- */
-static void 
-sod_atexit(void)
-{
-	if (ca != NULL) 
-		(void)c_authenticator_class_fini(); {
-	    (void)c_base_class_fini();
-	}
-	(void)unlink(sock_file);
-	(void)unlink(pid_file);
-	
-	closelog();
-}
-
-/*
- * By pthread(3) encapsulated signal handler.
- */
-static void *
-sod_sigaction(void *arg)
-{
-	sigset_t sigset;
-	int sig;
-	
-	if (sigfillset(&sigset) < 0)
-		sod_errx(EX_OSERR, "Can't initialize signal set");
-
-	if (pthread_sigmask(SIG_BLOCK, &sigset, NULL) != 0)
-		sod_errx(EX_OSERR, "Can't apply modefied signal set");
-			
-	for (;;) {
-		if (sigwait(&sigset, &sig) != 0)
-			sod_errx(EX_OSERR, "Can't select signal set");
-
-		switch (sig) {
-		case SIGHUP:
-		case SIGINT:
-		case SIGKILL:	
-		case SIGTERM:
-			exit(EX_OK);
-			break;
-		default:	
-			break;
-		}	
-	}	
-	return (NULL);
-}
 
 /*
  * Fork.
@@ -261,4 +198,67 @@ main(int argc, char **argv)
 		}
 	}
 			/* NOT REACHED */	
+}
+
+/*
+ * By pthread(3) encapsulated signal handler.
+ */
+static void *
+sod_sigaction(void *arg)
+{
+	sigset_t sigset;
+	int sig;
+	
+	if (sigfillset(&sigset) < 0)
+		sod_errx(EX_OSERR, "Can't initialize signal set");
+
+	if (pthread_sigmask(SIG_BLOCK, &sigset, NULL) != 0)
+		sod_errx(EX_OSERR, "Can't apply modefied signal set");
+			
+	for (;;) {
+		if (sigwait(&sigset, &sig) != 0)
+			sod_errx(EX_OSERR, "Can't select signal set");
+
+		switch (sig) {
+		case SIGHUP:
+		case SIGINT:
+		case SIGKILL:	
+		case SIGTERM:
+			exit(EX_OK);
+			break;
+		default:	
+			break;
+		}	
+	}	
+	return (NULL);
+}
+
+/*
+ * Abnormal process termination.
+ */
+static void 	
+sod_errx(int eval, const char *fmt, ...)
+{
+	va_list ap;
+	
+	va_start(ap, fmt);
+	vsyslog(LOG_ERR, fmt, ap);
+	va_end(ap);	
+	exit(eval);
+}
+
+/*
+ * byr atextit(3) registered cleanup handler. 
+ */
+static void 
+sod_atexit(void)
+{
+	if (ca != NULL) 
+		(void)c_authenticator_class_fini(); {
+	    (void)c_base_class_fini();
+	}
+	(void)unlink(sock_file);
+	(void)unlink(pid_file);
+	
+	closelog();
 }
