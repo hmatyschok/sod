@@ -183,9 +183,6 @@ c_sigaction_destroy(void *arg)
 	struct c_class *this;
 	struct c_methods *cm;
 	
-	if ((thr = arg) == NULL)
-	    return (-1);
-	
 	this = &c_sigaction_class;
 	cm = &this->c_base;
 	

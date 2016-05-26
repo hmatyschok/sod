@@ -213,9 +213,6 @@ c_authenticator_destroy(void *arg)
     struct c_class *this;
 	struct c_methods *cm;
 	
-	if ((thr = arg) == NULL)
-	    return (-1);
-	
 	this = &c_authenticator_class;
 	cm = &this->c_base;
 	
