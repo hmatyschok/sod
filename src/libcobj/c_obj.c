@@ -121,148 +121,6 @@ static struct c_class c_base_class = {
 };
 
 /******************************************************************************
- * Public Class-methods.
- ******************************************************************************/
- 
-/*
- * Create in-memory db(3) based on hash table 
- * and initialize corrosponding tail queue.
- */
-
-int
-c_cache_init(struct c_cache *ch)
-{
-	if (ch == NULL)
-		return (-1);	
-
-	if (ch->ch_db == NULL) {
-		ch->ch_db = dbopen(NULL, O_RDWR, 0, DB_HASH, NULL);
-		
-		if (ch->ch_db == NULL)
-			return (-1);
-			
-		TAILQ_INIT(&ch->ch_hd);
-	}
-	return (0);
-}
-
-
-/*
- * Insert object.
- */
-void *
-c_cache_add(struct c_cache *ch, DBT *key, void *arg)
-{	
-	DBT data;
-    struct c_obj *co;
-    
-	if ((co = arg) == NULL)
-	    return (NULL);
-
-	data.data = co;
-	data.size = co->co_len;
-	
-	if ((*ch->ch_db->put)(ch->ch_db, key, &data, 0))
-		return (NULL);
-	
-	co = data.data;
-	
-	TAILQ_INSERT_TAIL(&ch->ch_hd, co, co_next);
-	
-	return (co);
-}
-
-/*
- * Find requested object.
- */
-void * 	
-c_cache_get(struct c_cache *ch, DBT *key, void *arg __unused)
-{	
-	DBT data;
-
-    (void)memset(&data, 0, sizeof(data));
-
-    if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
-        return (NULL);
-	
-	return (data.data);
-}
-
-/*
- * Fetch requested object.
- */
-void * 	
-c_cache_del(struct c_cache *ch, DBT *key, void *arg __unused)
-{
-	DBT data;
-    struct c_obj *co;
-    	
-	(void)memset(&data, 0, sizeof(data));
-	
-	if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
-		return (NULL);
-	
-	if ((*ch->ch_db->del)(ch->ch_db, key, 0))
-		return (NULL);
-		
-	co = data.data;
-		
-	TAILQ_REMOVE(&ch->ch_hd, co, co_next);
-		
-	return (co);
-}
-
-void *
-c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
-{
-	struct c_obj *co;	
-	DBT key;
-
-	if ((co = arg) == NULL)
-	    return (NULL);
-	
-	key.data = &co->co_id;
-	key.size = sizeof(co->co_id);
-	
-	return ((*fn)(ch, &key, arg));
-}
-
-/*
- * Release by in-memory db(3) bound ressources,
- * if all objects were released previously.
- */
-int
-c_cache_free(struct c_cache *ch)
-{
-	if (ch == NULL)
-		return (-1);
-
-	if (ch->ch_db) { 
-        if (!TAILQ_EMPTY(&ch->ch_hd))
-		    return (-1);
-		
-	    if ((*ch->ch_db->close)(ch->ch_db))
-		    return (-1);
-		
-	    ch->ch_db = NULL;
-	}	
-	return (0);
-}
-
-void * 
-c_base_class_init(void)
-{
-	return (c_class_init(&c_base_class));	
-}
-
-int 
-c_base_class_fini(void)
-{
-
-	return (c_class_fini(&c_base_class));	
-}
-
-/******************************************************************************
  * Protected Class-methods.
  ******************************************************************************/
 
@@ -550,10 +408,147 @@ out:
 	return (eval);
 }
 
-
 /******************************************************************************
- * Public methods.
+ * Public Class-methods.
  ******************************************************************************/
+
+void * 
+c_base_class_init(void)
+{
+	return (c_class_init(&c_base_class));	
+}
+
+/*
+ * Create in-memory db(3) based on hash table 
+ * and initialize corrosponding tail queue.
+ */
+
+int
+c_cache_init(struct c_cache *ch)
+{
+	if (ch == NULL)
+		return (-1);	
+
+	if (ch->ch_db == NULL) {
+		ch->ch_db = dbopen(NULL, O_RDWR, 0, DB_HASH, NULL);
+		
+		if (ch->ch_db == NULL)
+			return (-1);
+			
+		TAILQ_INIT(&ch->ch_hd);
+	}
+	return (0);
+}
+
+
+/*
+ * Insert object.
+ */
+void *
+c_cache_add(struct c_cache *ch, DBT *key, void *arg)
+{	
+	DBT data;
+    struct c_obj *co;
+    
+	if ((co = arg) == NULL)
+	    return (NULL);
+
+	data.data = co;
+	data.size = co->co_len;
+	
+	if ((*ch->ch_db->put)(ch->ch_db, key, &data, 0))
+		return (NULL);
+	
+	co = data.data;
+	
+	TAILQ_INSERT_TAIL(&ch->ch_hd, co, co_next);
+	
+	return (co);
+}
+
+/*
+ * Find requested object.
+ */
+void * 	
+c_cache_get(struct c_cache *ch, DBT *key, void *arg __unused)
+{	
+	DBT data;
+
+    (void)memset(&data, 0, sizeof(data));
+
+    if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
+        return (NULL);
+	
+	return (data.data);
+}
+
+/*
+ * Fetch requested object.
+ */
+void * 	
+c_cache_del(struct c_cache *ch, DBT *key, void *arg __unused)
+{
+	DBT data;
+    struct c_obj *co;
+    	
+	(void)memset(&data, 0, sizeof(data));
+	
+	if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
+		return (NULL);
+	
+	if ((*ch->ch_db->del)(ch->ch_db, key, 0))
+		return (NULL);
+		
+	co = data.data;
+		
+	TAILQ_REMOVE(&ch->ch_hd, co, co_next);
+		
+	return (co);
+}
+
+void *
+c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
+{
+	struct c_obj *co;	
+	DBT key;
+
+	if ((co = arg) == NULL)
+	    return (NULL);
+	
+	key.data = &co->co_id;
+	key.size = sizeof(co->co_id);
+	
+	return ((*fn)(ch, &key, arg));
+}
+
+/*
+ * Release by in-memory db(3) bound ressources,
+ * if all objects were released previously.
+ */
+int
+c_cache_free(struct c_cache *ch)
+{
+	if (ch == NULL)
+		return (-1);
+
+	if (ch->ch_db) { 
+        if (!TAILQ_EMPTY(&ch->ch_hd))
+		    return (-1);
+		
+	    if ((*ch->ch_db->close)(ch->ch_db))
+		    return (-1);
+		
+	    ch->ch_db = NULL;
+	}	
+	return (0);
+}
+
+int 
+c_base_class_fini(void)
+{
+
+	return (c_class_fini(&c_base_class));	
+}
 
 /*
  * Non-operations, class scope.

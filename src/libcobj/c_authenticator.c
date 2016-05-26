@@ -33,7 +33,6 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include "c_obj.h"
@@ -86,9 +85,9 @@ static ca_state_fn_t 	c_authenticator_establish(void *);
 static void * 	c_authenticator_start(void *); 
 static int     c_authenticator_stop(void *);
 
-static struct c_thr * 	c_authenticator_create(int, int);
-static int 	c_authenticator_join(struct c_thr *);
-static int 	c_authenticator_destroy(struct c_thr *); 
+static void * 	c_authenticator_create(int, int);
+static int 	c_authenticator_join(void *);
+static int 	c_authenticator_destroy(void *); 
 
 /******************************************************************************
  * Class-attributes.
@@ -162,7 +161,7 @@ c_authenticator_class_fini(void)
 /*
  * Ctor.
  */
-static struct c_thr *
+static void *
 c_authenticator_create(int sock_srv, int sock_rmt) 
 {
 	struct c_class *this;
@@ -191,21 +190,31 @@ c_authenticator_create(int sock_srv, int sock_rmt)
  * Wrapper suspends execution of calling pthread(3).
  */
 static int 
-c_authenticator_join(struct c_thr *thr) 
+c_authenticator_join(void *arg) 
 {
-    void *arg = NULL;
+    struct c_thr *thr;
+    void *eval;
 	
-	return (pthread_join(thr->ct_tid, &arg));
+	if ((thr = arg) == NULL)
+	    return (-1);
+	
+	eval = NULL;
+	
+	return (pthread_join(thr->ct_tid, &eval));
 }
 
 /*
  * Dtor.
  */
 static int 
-c_authenticator_destroy(struct c_thr *thr) 
+c_authenticator_destroy(void *arg) 
 {
-	struct c_class *this;
+	struct c_thr *thr;
+    struct c_class *this;
 	struct c_methods *cm;
+	
+	if ((thr = arg) == NULL)
+	    return (-1);
 	
 	this = &c_authenticator_class;
 	cm = &this->c_base;
