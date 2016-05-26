@@ -124,10 +124,7 @@ main(int argc, char **argv)
 		sod_errx(EX_OSERR, "Can't register sod_atexit");
 /* 
  * Modefy signal handling.
- */ 
-	if (signal(SIGHUP, SIG_IGN) < 0)
-		sod_errx(EX_OSERR, "Can't disable SIGHUP");
-		
+ */
     if (sigfillset(&signalset) < 0)
 		sod_errx(EX_OSERR, "Can't initialize signal set");
 
