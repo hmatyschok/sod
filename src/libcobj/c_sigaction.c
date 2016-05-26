@@ -34,7 +34,7 @@
 #include "c_sigaction.h"
 
 /*
- * Component, proxyfies pam(8) based authentication service.
+ * Component, performs signal handling.
  */
 
 struct c_sigaction_softc {
