@@ -2,7 +2,7 @@
  * Copyright (c) 2016 Henning Matyschok
  *
  * Redistribution and use in source and binary forms, with or without
- * modific_sigsettion, are permitted provided that the following conditions
+ * modific_signaltion, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
@@ -25,26 +25,26 @@
  * version=0.2
  */
 
-#ifndef _C_SIGSET_H_
-#define	_C_SIGSET_H_
+#ifndef _C_SIGNAL_H_
+#define	_C_SIGNAL_H_
 
-typedef void * 	(*c_sigset_create_t)(void);
-typedef int     (*c_sigset_add_t)(int, void *);
-typedef int 	(*c_sigset_destroy_t)(void *);
+typedef void * 	(*c_signal_create_t)(void);
+typedef int     (*c_signal_add_t)(int, void *);
+typedef int 	(*c_signal_destroy_t)(void *);
 
 /*
  * Public interface.
  */
 
-struct c_sigset {
-	c_sigset_create_t 	c_sigset_create;
-	c_sigset_add_t       c_sigset_add;
-	c_sigset_destroy_t 	c_sigset_destroy;
+struct c_signal {
+	c_signal_create_t 	c_signal_create;
+	c_signal_add_t       c_signal_add;
+	c_signal_destroy_t 	c_signal_destroy;
 };
 
 __BEGIN_DECLS
-struct c_sigset * 	c_sigset_class_init(void);
-int 	c_sigset_class_fini(void);
+struct c_signal * 	c_signal_class_init(void);
+int 	c_signal_class_fini(void);
 __END_DECLS
 
-#endif /* _C_SIGSET_H_ */
+#endif /* _C_SIGNAL_H_ */
