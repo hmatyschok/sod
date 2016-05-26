@@ -168,25 +168,23 @@ c_authenticator_create(int sock_srv, int sock_rmt)
 	struct c_class *this;
 	struct c_methods *cm;
 	struct ca_softc *sc;
-	struct c_thr *thr;
 	
 	this = &c_authenticator_class;
 	cm = &this->c_base;
 	
-	if ((sc = (*cm->cm_create)(this)) != NULL) {
-		sc->sc_sock_rmt = sock_rmt;
-		sc->sc_sock_srv = sock_srv;
-		sc->sc_pamc.appdata_ptr = sc;
-		sc->sc_pamc.conv = c_authenticator_conv;
-		
-		thr = &sc->sc_thr;
+	if ((sc = (*cm->cm_create)(this)) == NULL) 
+		return (NULL);
+
+	sc->sc_sock_rmt = sock_rmt;
+	sc->sc_sock_srv = sock_srv;
+	sc->sc_pamc.appdata_ptr = sc;
+	sc->sc_pamc.conv = c_authenticator_conv;
 /*
  * Release stalled execution.
  */		
-		(void)(*cm->cm_wakeup)(cm, thr);
-	} else
-		thr = NULL;
-	return (thr);
+	(void)(*cm->cm_wakeup)(cm, sc);
+
+	return (&sc->sc_thr);
 }
 
 /*

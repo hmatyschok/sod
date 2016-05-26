@@ -40,12 +40,15 @@
 
 #define C_NMAX 	127
 
+struct c_cache;
 struct c_methods;
 struct c_obj;
 
 /*
  * Service Primitives (SPI).
  */
+
+typedef void *  (*c_cache_fn_t)(struct c_cache *, DBT *, void *);
 
 #define C_MSG_ACK 	0x00000010
 #define C_MSG_NAK 	0x00000020
@@ -177,6 +180,16 @@ struct c_msg {
 #define C_MSG_QLEN 	13
 
 __BEGIN_DECLS
+
+int 	c_cache_init(struct c_cache *);
+int 	c_cache_free(struct c_cache *);
+
+void *   c_cache_add(struct c_cache *, DBT *, void *);
+void *   c_cache_get(struct c_cache *, DBT *, void *);
+void *   c_cache_del(struct c_cache *, DBT *, void *);
+
+void * 	c_cache_fn(c_cache_fn_t, struct c_cache *, void *);
+
 void * 	c_base_class_init(void);
 int 	c_base_class_fini(void);
 struct c_msg * 	c_msg_alloc(void);

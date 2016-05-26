@@ -36,17 +36,6 @@
  * Implements abstract class.
  */
 
-typedef void *  (*c_cache_fn_t)(struct c_cache *, DBT *, void *);
-
-static int 	c_cache_init(struct c_cache *);
-static int 	c_cache_free(struct c_cache *);
-
-static void *   c_cache_add(struct c_cache *, DBT *, void *);
-static void *   c_cache_get(struct c_cache *, DBT *, void *);
-static void *   c_cache_del(struct c_cache *, DBT *, void *);
-
-static void * 	c_cache_fn(c_cache_fn_t, struct c_cache *, void *);
-
 static void *	c_class_init(void *);
 static int 	c_class_fini(void *);
 static void * 	c_thr_create(void *);
@@ -132,15 +121,15 @@ static struct c_class c_base_class = {
 };
 
 /******************************************************************************
- * Private class-methods
+ * Public Class-methods.
  ******************************************************************************/
-
+ 
 /*
  * Create in-memory db(3) based on hash table 
  * and initialize corrosponding tail queue.
  */
 
-static int
+int
 c_cache_init(struct c_cache *ch)
 {
 	if (ch == NULL)
@@ -161,7 +150,7 @@ c_cache_init(struct c_cache *ch)
 /*
  * Insert object.
  */
-static void *
+void *
 c_cache_add(struct c_cache *ch, DBT *key, void *arg)
 {	
 	DBT data;
@@ -186,7 +175,7 @@ c_cache_add(struct c_cache *ch, DBT *key, void *arg)
 /*
  * Find requested object.
  */
-static void * 	
+void * 	
 c_cache_get(struct c_cache *ch, DBT *key, void *arg __unused)
 {	
 	DBT data;
@@ -202,7 +191,7 @@ c_cache_get(struct c_cache *ch, DBT *key, void *arg __unused)
 /*
  * Fetch requested object.
  */
-static void * 	
+void * 	
 c_cache_del(struct c_cache *ch, DBT *key, void *arg __unused)
 {
 	DBT data;
@@ -223,7 +212,7 @@ c_cache_del(struct c_cache *ch, DBT *key, void *arg __unused)
 	return (co);
 }
 
-static void *
+void *
 c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
 {
 	struct c_obj *co;	
@@ -242,7 +231,7 @@ c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
  * Release by in-memory db(3) bound ressources,
  * if all objects were released previously.
  */
-static int
+int
 c_cache_free(struct c_cache *ch)
 {
 	if (ch == NULL)
@@ -259,10 +248,6 @@ c_cache_free(struct c_cache *ch)
 	}	
 	return (0);
 }
-
-/******************************************************************************
- * Public Class-methods.
- ******************************************************************************/
 
 void * 
 c_base_class_init(void)
