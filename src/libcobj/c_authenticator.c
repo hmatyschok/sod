@@ -259,7 +259,7 @@ c_authenticator_establish(void *arg)
 		goto out;
 		
 #ifdef C_OBJ_DEBUG		
-syslog(LOG_ERR, "%s\n", __func__);
+syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */	
 	
 	if (c_msg_fn(c_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0) 
@@ -312,7 +312,7 @@ c_authenticator_authenticate(void *arg)
 		goto out;
 
 #ifdef C_OBJ_DEBUG		
-syslog(LOG_ERR, "%s\n", __func__);
+syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */	
 	
 /*
@@ -419,7 +419,7 @@ c_authenticator_response(void *arg)
 		goto out;
 		
 #ifdef C_OBJ_DEBUG		
-syslog(LOG_ERR, "%s\n", __func__);
+syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */
 
 	(void)c_msg_fn(c_msg_send, sc->sc_sock_rmt, &sc->sc_buf);
@@ -444,7 +444,7 @@ c_authenticator_stop(void *arg)
 	(void)close(sc->sc_sock_rmt);
 
 #ifdef C_OBJ_DEBUG		
-syslog(LOG_ERR, "%s\n", __func__);
+syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */
 
     return (0);
@@ -517,7 +517,7 @@ c_authenticator_conv(int num_msg, const struct pam_message **msg,
 			break;
 			
 #ifdef C_OBJ_DEBUG
-syslog(LOG_ERR, "%s: rx: %s\n", __func__, sc->sc_buf.msg_tok);	
+syslog(LOG_DEBUG, "%s: rx: %s\n", __func__, sc->sc_buf.msg_tok);	
 #endif /* C_OBJ_DEBUG */	
 				
 		(void)strncpy(tok[i].resp, sc->sc_buf.msg_tok, C_NMAX);
