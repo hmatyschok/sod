@@ -161,6 +161,15 @@ c_sigaction_add(int how, void *arg)
 	if (sc == NULL)
 	    return (-1);
 	
+	switch (how) {
+	case SIGHUP:
+	case SIGINT:
+	case SIGKILL:	
+	case SIGTERM:
+		break;
+	default:	
+		return (-1);
+	}	
 	return (pthread_sigmask(how, &sc->sc_sigset, NULL));
 }
 
