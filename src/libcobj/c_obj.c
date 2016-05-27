@@ -431,9 +431,7 @@ out:
  ******************************************************************************/
 
 /*
- * Create in-memory db(3) implementing hash 
- * table and initialize corrosponding tail 
- * queue.
+ * Initialize tail queue.
  */
 
 int
@@ -491,22 +489,18 @@ c_cache_get(struct c_cache *ch, void *arg)
 void * 	
 c_cache_del(struct c_cache *ch, void *arg)
 {	
-	struct c_obj *co, *co_tmp, *key;
+	struct c_obj *co;
 	
-	if ((key = arg) == NULL) 
-	    return (NULL);
-	
-	TAILQ_FOREACH_SAFE(co, ch, co_next, co_tmp) {
-        if (co->co_id == key->co_id) {
-            TAILQ_REMOVE(ch, co, co_next);
-            break;
-        }
-    }
+	co = c_cache_get(ch, arg);
+
+	if (co)
+	    TAILQ_REMOVE(ch, co, co_next);
+           
 	return (co);
 }
 
 /*
- * Test, if there exists no item.
+ * Validate, if there is nothing enqueued.
  */
 int
 c_cache_free(struct c_cache *ch)
