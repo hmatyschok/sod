@@ -44,7 +44,7 @@ struct c_signal_softc {
 #define sc_id 	sc_thr.ct_co.co_id
 #define sc_len 	sc_thr.ct_co.co_len	
 	struct sigaction    sc_sigaction;
-	signal_t    sc_sigset;
+	sigset_t    sc_sigset;
 };
 #define C_SIGNAL_CLASS 	1464266531
 #define C_SIGNAL_LEN (sizeof(struct c_signal_softc))
@@ -53,7 +53,7 @@ static void * 	c_signal_start(void *);
 static int     c_signal_stop(void *);
 
 static void * 	c_signal_create(void);
-static int 	c_signal_add(int, void *);
+static int 	c_signal_sigmask(int, void *);
 static int 	c_signal_destroy(void *); 
 
 /******************************************************************************
@@ -62,7 +62,7 @@ static int 	c_signal_destroy(void *);
  
 static struct c_signal c_signal_methods = {
 	.c_signal_create 		= c_signal_create,
-	.c_signal_add        = c_signal_add,
+	.c_signal_sigmask        = c_signal_sigmask,
 	.c_signal_destroy 	= c_signal_destroy,
 };
 
@@ -152,10 +152,10 @@ bad:
 }
 
 /*
- * Add signal on sigset.
+ * Applies sigmask on calling pthread(3).
  */
 static int 
-c_signal_add(int how, void *arg) 
+c_signal_sigmask(int how, void *arg) 
 { 
     struct c_thr *thr;
     struct c_class *this;
@@ -171,10 +171,9 @@ c_signal_add(int how, void *arg)
 	    return (-1);
 	
 	switch (how) {
-	case SIGHUP:
-	case SIGINT:
-	case SIGKILL:	
-	case SIGTERM:
+	case SIG_BLOCK:
+	case SIG_UNBLOCK:
+	case SIG_SETMASK:
 		break;
 	default:	
 		return (-1);
@@ -217,7 +216,9 @@ c_signal_start(void *arg)
 	for (;;) {
 		if (sigwait(&sc->sc_sigset, &sig) != 0)
 			errx(EX_OSERR, "Can't select signal set");
-
+/*
+ * XXX: this will be replaced by callback...
+ */
 		switch (sig) {
 		case SIGHUP:
 		case SIGINT:

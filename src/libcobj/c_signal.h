@@ -29,7 +29,7 @@
 #define	_C_SIGNAL_H_
 
 typedef void * 	(*c_signal_create_t)(void);
-typedef int     (*c_signal_add_t)(int, void *);
+typedef int     (*c_signal_sigmask_t)(int, void *);
 typedef int 	(*c_signal_destroy_t)(void *);
 
 /*
@@ -38,7 +38,7 @@ typedef int 	(*c_signal_destroy_t)(void *);
 
 struct c_signal {
 	c_signal_create_t 	c_signal_create;
-	c_signal_add_t       c_signal_add;
+	c_signal_sigmask_t       c_signal_sigmask;
 	c_signal_destroy_t 	c_signal_destroy;
 };
 
