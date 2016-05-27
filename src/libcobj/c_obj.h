@@ -82,7 +82,8 @@ struct c_obj {
 	long 	co_id; 	/* identifier */
 	ssize_t 	co_len;
 	int         co_flags;
-#define C_LOCKED    0x00000001	
+#define C_INIT  0x00000001	
+#define C_LOCKED    0x00000002	
 	TAILQ_ENTRY(c_obj) co_next;
 };
 TAILQ_HEAD(c_cache, c_obj);
@@ -169,8 +170,6 @@ struct c_msg {
 #define C_MSG_QLEN 	13
 
 __BEGIN_DECLS
-int 	c_cache_init(struct c_cache *);
-int 	c_cache_free(struct c_cache *);
 void *   c_cache_add(struct c_cache *, void *);
 void *   c_cache_get(struct c_cache *, void *);
 void *   c_cache_del(struct c_cache *, void *);

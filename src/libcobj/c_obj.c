@@ -36,7 +36,9 @@
  * Implements abstract class.
  */
 
+static int  c_children_free(struct c_class *);
 static int  c_instances_free(struct c_class *);
+
 static void *	c_class_init(void *);
 static int 	c_class_fini(void *);
 static void * 	c_thr_create(void *);
@@ -125,7 +127,30 @@ static struct c_class c_base_class = {
 /******************************************************************************
  * Private class-methods.
  ******************************************************************************/
- 
+
+static int 
+c_children_free(struct c_class *cls)
+{
+    struct c_methods *cm;
+    struct c_cache *ch;
+    struct c_obj *co;
+
+    if (cls == NULL)
+        return (-1);
+    
+    cm = &cls->c_base;
+    ch = &cls->c_children;
+
+    while (!TAILQ_EMPTY(ch)) {
+        co = TAILQ_FIRST(ch);
+        
+        if ((*cm->cm_fini)(co))
+            return (-1);
+    }
+    return (0);
+}
+
+
 static int 
 c_instances_free(struct c_class *cls)
 {
@@ -164,26 +189,30 @@ c_class_init(void *arg)
 	
 	if ((cls = arg) == NULL) 
 		return (NULL);
+
+    if ((cls->c_flags & C_INIT) ^ C_INIT) {
+/*
+ * Initialize tail queue.
+ */
+	    TAILQ_INIT(&cls->c_children);
+	    TAILQ_INIT(&cls->c_instances);
 		
-	if (c_cache_init(&cls->c_children))
-		return (NULL);
+	    if (cls != &c_base_class) { 
+            ch = &c_base_class.c_children;
 
-	if (c_cache_init(&cls->c_instances)) 
-		return (NULL);
+            if (c_cache_add(ch, cls) == NULL) 
+		        return (NULL);
 	
-	ch = &c_base_class.c_children;
-
-    if (c_cache_add(ch, cls) == NULL) 
-		return (NULL);
-	
-	if (cls != &c_base_class) 
-		cls->c_base = c_base_class.c_base;
+            cls->c_base = c_base_class.c_base;
+	    }
+	    cls->c_flags |= C_INIT;
+	}
 	
 #ifdef C_OBJ_DEBUG		
 syslog(LOG_DEBUG, "%s: %ld\n", __func__, cls->c_id);
 #endif /* C_OBJ_DEBUG */
 
-	return (&cls->c_base);	
+	return (&cls->c_base);
 }
 
 static int 
@@ -195,19 +224,26 @@ c_class_fini(void *arg)
 	if ((cls = arg) == NULL) 
 		return (-1);
 	
-	if (c_cache_free(&cls->c_children))
-		return (-1);
+	if (cls->c_flags & C_INIT) {
+/*
+ * Releases enqueued items.
+ */	 
+	    if (c_children_free(cls))
+		    return (-1);
 
-	if (c_instances_free(cls)) 
-		return (-1);
+	    if (c_instances_free(cls)) 
+		    return (-1);
 
-    ch = &c_base_class.c_children;
+        if (cls != &c_base_class) {
+            ch = &c_base_class.c_children;
 
-    if (c_cache_del(ch, cls) == NULL) 
-		return (-1);
+            if (c_cache_del(ch, cls) == NULL) 
+		        return (-1);
 
-	if (cls != &c_base_class) 		
-		cls->c_base = c_nop;
+	        cls->c_base = c_nop;
+		}
+	    cls->c_flags &= ~C_INIT;	
+	}
 		
 #ifdef C_OBJ_DEBUG		
 syslog(LOG_DEBUG, "%s: %ld\n", __func__, cls->c_id);
@@ -460,21 +496,6 @@ out:
  ******************************************************************************/
 
 /*
- * Initialize tail queue.
- */
-
-int
-c_cache_init(struct c_cache *ch)
-{
-	if (ch == NULL)
-		return (-1);	
-
-	TAILQ_INIT(ch);
-
-	return (0);
-}
-
-/*
  * Insert object.
  */
 void *
@@ -523,22 +544,6 @@ c_cache_del(struct c_cache *ch, void *arg)
            
 	return (co);
 }
-
-/*
- * Validate, if there is nothing enqueued.
- */
-int
-c_cache_free(struct c_cache *ch)
-{
-	if (ch == NULL)
-		return (-1);
-
-	if (!TAILQ_EMPTY(ch))
-        return (-1);
-			
-	return (0);
-}
-
 
 void * 
 c_base_class_init(void)
