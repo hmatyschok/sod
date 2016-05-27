@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <pthread.h>
+#include <pthread.h>
 
 #ifdef C_OBJ_DEBUG
 #include <syslog.h>
@@ -84,18 +85,7 @@ struct c_obj {
 #define C_LOCKED    0x00000001	
 	TAILQ_ENTRY(c_obj) co_next;
 };
-TAILQ_HEAD(c_obj_hd, c_obj);
-
-/*
- * Implements generic cache
- * based on db(3) API. 
- */
-struct c_cache {
-	struct c_obj_hd 	ch_hd;
-	DB 	*ch_db;
-};
-
-typedef void *  (*c_cache_fn_t)(struct c_cache *, DBT *, void *);
+TAILQ_HEAD(c_cache, c_obj);
 
 /*
  * Implements generic interface. 
@@ -181,10 +171,9 @@ struct c_msg {
 __BEGIN_DECLS
 int 	c_cache_init(struct c_cache *);
 int 	c_cache_free(struct c_cache *);
-void *   c_cache_add(struct c_cache *, DBT *, void *);
-void *   c_cache_get(struct c_cache *, DBT *, void *);
-void *   c_cache_del(struct c_cache *, DBT *, void *);
-void * 	c_cache_fn(c_cache_fn_t, struct c_cache *, void *);
+void *   c_cache_add(struct c_cache *, void *);
+void *   c_cache_get(struct c_cache *, void *);
+void *   c_cache_del(struct c_cache *, void *);
 
 struct c_msg * 	c_msg_alloc(void);
 void 	c_msg_prepare(const char *, uint32_t, long, struct c_msg *);

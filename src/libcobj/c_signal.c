@@ -165,7 +165,7 @@ c_signal_sigmask(int how, void *arg)
 	    return (-1);
     
 	this = &c_signal_class;
-	sc = c_cache_fn(c_cache_get, &this->c_instances, thr);
+	sc = c_cache_get(&this->c_instances, thr);
 	
 	if (sc == NULL)
 	    return (-1);

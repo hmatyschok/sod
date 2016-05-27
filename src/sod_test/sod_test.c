@@ -87,7 +87,7 @@ sod_test(void *arg)
 	    goto bad2;
 	
 	state = C_AUTHENTICATOR_AUTH_REQ;
-	id = 0;	
+	id = buf->msg_id;	
 	tok = sta->sta_user;
 	
 	while (state) {
@@ -104,19 +104,19 @@ sod_test(void *arg)
  * Send message.
  */ 		
 			if (c_msg_fn(c_msg_send, s, buf) < 0) {
-				syslog(LOG_ERR, 
+				syslog(LOG_DEBUG, 
 					"Can't send PAM_USER as request\n");
 				state = 0;
 				break;
 			}
-			syslog(LOG_ERR, 
+			syslog(LOG_DEBUG, 
 				"tx: C_AUTHENTICATOR_AUTH_REQ: %s\n", 
 				buf->msg_tok);		
 /*
  * Await response.
  */			
 			if (c_msg_fn(c_msg_recv, s, buf) < 0) {
-				syslog(LOG_ERR, 
+				syslog(LOG_DEBUG, 
 					"Can't receive "
 					"C_AUTHENTICATOR_AUTH_NAK "
 					"as response");
@@ -132,7 +132,7 @@ sod_test(void *arg)
 			} 
 				
 			if (buf->msg_id != id) {
-				syslog(LOG_ERR, "Invalid tid received");
+				syslog(LOG_DEBUG, "Invalid tid received");
 				state = 0;
 				break;
 			}
@@ -142,7 +142,7 @@ sod_test(void *arg)
 			state = buf->msg_code;
 			break;
 		case C_AUTHENTICATOR_AUTH_NAK:
-			syslog(LOG_ERR, 
+			syslog(LOG_DEBUG, 
 				"rx: C_AUTHENTICATOR_AUTH_NAK: %s", 
 				buf->msg_tok);
 /*
@@ -152,12 +152,12 @@ sod_test(void *arg)
 			tok = sta->sta_pw;	
 			break;
 		case C_AUTHENTICATOR_AUTH_ACK:
-			syslog(LOG_ERR, 
+			syslog(LOG_DEBUG, 
 				"rx: C_AUTHENTICATOR_AUTH_ACK: PAM_SUCCESS\n");
 			state = 0;
 			break;
 		case C_AUTHENTICATOR_AUTH_REJ:
-			syslog(LOG_ERR, 
+			syslog(LOG_DEBUG, 
 				"rx: C_AUTHENTICATOR_AUTH_REJ: PAM_AUTH_ERR\n");
 			state = 0;
 			break;

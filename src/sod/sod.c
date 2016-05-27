@@ -53,6 +53,7 @@ static pid_t 	pid;
 static pthread_t 	tid;
 
 static struct c_authenticator *ca;
+static struct c_signal *cs;
 
 static char *cmd; 
 

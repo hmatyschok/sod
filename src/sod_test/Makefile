@@ -29,7 +29,7 @@ NO_MAN=
 PROG=	sod_test
 SRCS=	sod_test.c
 
-LDADD=	-lcobj
+LDADD=	-lcobj -lthr
 
 .include <bsd.prog.mk>
 

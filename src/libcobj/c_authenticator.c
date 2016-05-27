@@ -134,6 +134,10 @@ c_authenticator_class_init(void)
 
 	cm->cm_start = c_authenticator_start;
 	cm->cm_stop = c_authenticator_stop;
+
+#ifdef C_OBJ_DEBUG		
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* C_OBJ_DEBUG */
 	
 	return (this->c_public);	
 }
@@ -150,6 +154,10 @@ c_authenticator_class_fini(void)
 
 	this = &c_authenticator_class;
 	cm = &this->c_base;
+	
+#ifdef C_OBJ_DEBUG		
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* C_OBJ_DEBUG */	
 	
 	return ((*cm->cm_fini)(this));	
 }
@@ -182,6 +190,10 @@ c_authenticator_create(int sock_srv, int sock_rmt)
  * Release stalled execution.
  */		
 	(void)(*cm->cm_wakeup)(cm, sc);
+
+#ifdef C_OBJ_DEBUG		
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* C_OBJ_DEBUG */
 
 	return (&sc->sc_thr);
 }
@@ -216,6 +228,10 @@ c_authenticator_destroy(void *arg)
 	this = &c_authenticator_class;
 	cm = &this->c_base;
 	
+#ifdef C_OBJ_DEBUG		
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* C_OBJ_DEBUG */	
+
 	return ((*cm->cm_destroy)(this, thr));
 }
 
@@ -243,6 +259,10 @@ c_authenticator_start(void *arg)
 	
 	if ((*cm->cm_sleep)(cm, &sc->sc_thr) == 0)
 		fn = (ca_state_t)c_authenticator_establish;	
+
+#ifdef C_OBJ_DEBUG		
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* C_OBJ_DEBUG */	
 	
 	while (fn != NULL)
 		fn = (ca_state_t)(*fn)(sc);
@@ -268,10 +288,8 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 	
 	if (c_msg_fn(c_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0) 
 		goto out;
-/*
- * An running instance cannot send messages to itself.
- */	
-	if (sc->sc_buf.msg_id == sc->sc_id)
+
+	if (sc->sc_buf.msg_id != C_MSG)
 		goto out;
 /*
  * State transition, if any.

@@ -145,12 +145,16 @@ c_class_init(void *arg)
 	}
 	
 	if (cls != &c_base_class) {
-		if (c_cache_fn(c_cache_add, 
-		    &c_base_class.c_children, cls) == NULL) {
+		if (c_cache_add(&c_base_class.c_children, cls) == NULL) {
 			return (NULL);
 		}
 		cls->c_base = c_base_class.c_base;
 	}
+	
+#ifdef C_OBJ_DEBUG		
+syslog(LOG_DEBUG, "%s: %ld\n", __func__, cls->c_id);
+#endif /* C_OBJ_DEBUG */
+
 	return (&cls->c_base);	
 }
 
@@ -158,23 +162,27 @@ static int
 c_class_fini(void *arg)
 {
 	struct c_class *cls;
-	
+
 	if ((cls = arg) == NULL) 
 		return (-1);
 	
 	if (c_cache_free(&cls->c_children))
 		return (-1);
-		
+
 	if (c_cache_free(&cls->c_instances))
 		return (-1);
 
 	if (cls != &c_base_class) {
-		if (c_cache_fn(c_cache_del, 
-		    &c_base_class.c_children, cls) == NULL) {
+		if (c_cache_del(&c_base_class.c_children, cls) == NULL) {
 			return (-1);
 		}
 		cls->c_base = c_nop;
 	}
+	
+#ifdef C_OBJ_DEBUG		
+syslog(LOG_DEBUG, "%s: %ld\n", __func__, cls->c_id);
+#endif /* C_OBJ_DEBUG */
+
 	return (0);	
 }
 
@@ -231,10 +239,15 @@ c_thr_create(void *arg)
 	
 	thr->ct_len = cls->c_len;
 	
-	if (c_cache_fn(c_cache_add, &cls->c_instances, thr) == NULL) {
+	if (c_cache_add(&cls->c_instances, thr) == NULL) {
 	    (void)pthread_cancel(thr->ct_tid);
 		goto bad2;
 	}
+
+#ifdef C_OBJ_DEBUG		
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* C_OBJ_DEBUG */	
+	
 out:		
 	return (thr);
 bad2:	
@@ -399,11 +412,16 @@ c_thr_destroy(void *arg0, void *arg1)
 /*
  * Release object from database.
  */	
-	thr = c_cache_fn(c_cache_del, &cls->c_instances, thr);
+	thr = c_cache_del(&cls->c_instances, thr);
 	if (thr) {
 		eval = (*cls->c_base.cm_stop)(thr);
 		free(thr);    
 	}
+	
+#ifdef C_OBJ_DEBUG		
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* C_OBJ_DEBUG */	
+
 out:		
 	return (eval);
 }
@@ -412,15 +430,10 @@ out:
  * Public Class-methods.
  ******************************************************************************/
 
-void * 
-c_base_class_init(void)
-{
-	return (c_class_init(&c_base_class));	
-}
-
 /*
- * Create in-memory db(3) based on hash table 
- * and initialize corrosponding tail queue.
+ * Create in-memory db(3) implementing hash 
+ * table and initialize corrosponding tail 
+ * queue.
  */
 
 int
@@ -429,39 +442,27 @@ c_cache_init(struct c_cache *ch)
 	if (ch == NULL)
 		return (-1);	
 
-	if (ch->ch_db == NULL) {
-		ch->ch_db = dbopen(NULL, O_RDWR, 0, DB_HASH, NULL);
-		
-		if (ch->ch_db == NULL)
-			return (-1);
-			
-		TAILQ_INIT(&ch->ch_hd);
-	}
+	TAILQ_INIT(ch);
+
 	return (0);
 }
-
 
 /*
  * Insert object.
  */
 void *
-c_cache_add(struct c_cache *ch, DBT *key, void *arg)
+c_cache_add(struct c_cache *ch, void *arg)
 {	
-	DBT data;
     struct c_obj *co;
     
 	if ((co = arg) == NULL)
 	    return (NULL);
 
-	data.data = co;
-	data.size = co->co_len;
+	TAILQ_INSERT_TAIL(ch, co, co_next);
 	
-	if ((*ch->ch_db->put)(ch->ch_db, key, &data, 0))
-		return (NULL);
-	
-	co = data.data;
-	
-	TAILQ_INSERT_TAIL(&ch->ch_hd, co, co_next);
+#ifdef C_OBJ_DEBUG		
+syslog(LOG_DEBUG, "%s: %ld\n", __func__, co->co_id);
+#endif /* C_OBJ_DEBUG */	
 	
 	return (co);
 }
@@ -470,60 +471,42 @@ c_cache_add(struct c_cache *ch, DBT *key, void *arg)
  * Find requested object.
  */
 void * 	
-c_cache_get(struct c_cache *ch, DBT *key, void *arg __unused)
+c_cache_get(struct c_cache *ch, void *arg)
 {	
-	DBT data;
-
-    (void)memset(&data, 0, sizeof(data));
-
-    if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
-        return (NULL);
+	struct c_obj *co, *co_tmp, *key;
 	
-	return (data.data);
+	if ((key = arg) == NULL) 
+	    return (NULL);
+	
+	TAILQ_FOREACH_SAFE(co, ch, co_next, co_tmp) {
+        if (co->co_id == key->co_id) 
+            break;
+    }
+	return (co);
 }
 
 /*
  * Fetch requested object.
  */
 void * 	
-c_cache_del(struct c_cache *ch, DBT *key, void *arg __unused)
-{
-	DBT data;
-    struct c_obj *co;
-    	
-	(void)memset(&data, 0, sizeof(data));
+c_cache_del(struct c_cache *ch, void *arg)
+{	
+	struct c_obj *co, *co_tmp, *key;
 	
-	if ((*ch->ch_db->get)(ch->ch_db, key, &data, 0))
-		return (NULL);
+	if ((key = arg) == NULL) 
+	    return (NULL);
 	
-	if ((*ch->ch_db->del)(ch->ch_db, key, 0))
-		return (NULL);
-		
-	co = data.data;
-		
-	TAILQ_REMOVE(&ch->ch_hd, co, co_next);
-		
+	TAILQ_FOREACH_SAFE(co, ch, co_next, co_tmp) {
+        if (co->co_id == key->co_id) {
+            TAILQ_REMOVE(ch, co, co_next);
+            break;
+        }
+    }
 	return (co);
 }
 
-void *
-c_cache_fn(c_cache_fn_t fn, struct c_cache *ch, void *arg)
-{
-	struct c_obj *co;	
-	DBT key;
-
-	if ((co = arg) == NULL)
-	    return (NULL);
-	
-	key.data = &co->co_id;
-	key.size = sizeof(co->co_id);
-	
-	return ((*fn)(ch, &key, arg));
-}
-
 /*
- * Release by in-memory db(3) bound ressources,
- * if all objects were released previously.
+ * Test, if there exists no item.
  */
 int
 c_cache_free(struct c_cache *ch)
@@ -531,16 +514,17 @@ c_cache_free(struct c_cache *ch)
 	if (ch == NULL)
 		return (-1);
 
-	if (ch->ch_db) { 
-        if (!TAILQ_EMPTY(&ch->ch_hd))
-		    return (-1);
-		
-	    if ((*ch->ch_db->close)(ch->ch_db))
-		    return (-1);
-		
-	    ch->ch_db = NULL;
-	}	
+	if (!TAILQ_EMPTY(ch))
+        return (-1);
+			
 	return (0);
+}
+
+
+void * 
+c_base_class_init(void)
+{
+	return (c_class_init(&c_base_class));	
 }
 
 int 
