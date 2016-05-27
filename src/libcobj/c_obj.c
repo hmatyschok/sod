@@ -36,6 +36,7 @@
  * Implements abstract class.
  */
 
+static int  c_instances_free(struct c_class *);
 static void *	c_class_init(void *);
 static int 	c_class_fini(void *);
 static void * 	c_thr_create(void *);
@@ -120,8 +121,35 @@ static struct c_class c_base_class = {
 	.c_public 		= &c_nop,
 };
 
+
 /******************************************************************************
- * Protected Class-methods.
+ * Private class-methods.
+ ******************************************************************************/
+ 
+static int 
+c_instances_free(struct c_class *cls)
+{
+    struct c_methods *cm;
+    struct c_cache *ch;
+    struct c_obj *co;
+
+    if (cls == NULL)
+        return (-1);
+    
+    cm = &cls->c_base;
+    ch = &cls->c_instances;
+
+    while (!TAILQ_EMPTY(ch)) {
+        co = TAILQ_FIRST(ch);
+        
+        if ((*cm->cm_destroy)(cls, co))
+            return (-1);
+    }
+    return (0);
+}
+
+/******************************************************************************
+ * Protected class-methods.
  ******************************************************************************/
 
 /*
@@ -132,6 +160,7 @@ static void *
 c_class_init(void *arg)
 {
 	struct c_class *cls;
+	struct c_cache *ch;
 	
 	if ((cls = arg) == NULL) 
 		return (NULL);
@@ -139,17 +168,16 @@ c_class_init(void *arg)
 	if (c_cache_init(&cls->c_children))
 		return (NULL);
 
-	if (c_cache_init(&cls->c_instances)) {
-		c_cache_free(&cls->c_children);
+	if (c_cache_init(&cls->c_instances)) 
 		return (NULL);
-	}
 	
-	if (cls != &c_base_class) {
-		if (c_cache_add(&c_base_class.c_children, cls) == NULL) {
-			return (NULL);
-		}
+	ch = &c_base_class.c_children;
+
+    if (c_cache_add(ch, cls) == NULL) 
+		return (NULL);
+	
+	if (cls != &c_base_class) 
 		cls->c_base = c_base_class.c_base;
-	}
 	
 #ifdef C_OBJ_DEBUG		
 syslog(LOG_DEBUG, "%s: %ld\n", __func__, cls->c_id);
@@ -162,6 +190,7 @@ static int
 c_class_fini(void *arg)
 {
 	struct c_class *cls;
+    struct c_cache *ch;
 
 	if ((cls = arg) == NULL) 
 		return (-1);
@@ -169,23 +198,23 @@ c_class_fini(void *arg)
 	if (c_cache_free(&cls->c_children))
 		return (-1);
 
-	if (c_cache_free(&cls->c_instances))
+	if (c_instances_free(cls)) 
 		return (-1);
 
-	if (cls != &c_base_class) {
-		if (c_cache_del(&c_base_class.c_children, cls) == NULL) {
-			return (-1);
-		}
+    ch = &c_base_class.c_children;
+
+    if (c_cache_del(ch, cls) == NULL) 
+		return (-1);
+
+	if (cls != &c_base_class) 		
 		cls->c_base = c_nop;
-	}
-	
+		
 #ifdef C_OBJ_DEBUG		
 syslog(LOG_DEBUG, "%s: %ld\n", __func__, cls->c_id);
 #endif /* C_OBJ_DEBUG */
 
 	return (0);	
 }
-
 
 /*
  * An abstract component acts as factory for generating a component
@@ -456,11 +485,7 @@ c_cache_add(struct c_cache *ch, void *arg)
 	if ((co = arg) == NULL)
 	    return (NULL);
 
-	TAILQ_INSERT_TAIL(ch, co, co_next);
-	
-#ifdef C_OBJ_DEBUG		
-syslog(LOG_DEBUG, "%s: %ld\n", __func__, co->co_id);
-#endif /* C_OBJ_DEBUG */	
+	TAILQ_INSERT_TAIL(ch, co, co_next);	
 	
 	return (co);
 }
