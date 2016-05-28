@@ -294,7 +294,7 @@ c_obj_db_add(void *arg0, void *arg1)
     if (sc == NULL)
         return (NULL);
     
-    if ((sc->sc_co0 = arg1) == NULL)
+    if ((sc->sc_co0 = arg0) == NULL)
         return (NULL);
     
     sc->sc_fn = c_obj_add;
@@ -323,7 +323,7 @@ c_obj_db_get(void *arg0, void *arg1)
     if (sc == NULL)
         return (NULL);
     
-    if ((sc->sc_co0 = arg1) == NULL)
+    if ((sc->sc_co0 = arg0) == NULL)
         return (NULL);
     
     sc->sc_fn = c_obj_get;
@@ -353,7 +353,7 @@ c_obj_db_del(void *arg0, void *arg1)
     if (sc == NULL)
         return (NULL);
     
-    if ((sc->sc_co0 = arg1) == NULL)
+    if ((sc->sc_co0 = arg0) == NULL)
         return (NULL);
     
     sc->sc_fn = c_obj_del;
