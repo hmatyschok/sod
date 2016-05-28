@@ -163,84 +163,101 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 }
 
 /******************************************************************************
- * Public methods.
+ * Private methods, implements pthread(3) life-cycle.
  ******************************************************************************/
 
 /*
- * Ctor.
- */
-static void *
-c_authenticator_create(int sock_srv, int sock_rmt) 
-{
-    struct c_class *this;
-    struct c_methods *cm;
-    struct ca_softc *sc;
-    
-    this = &c_authenticator_class;
-    cm = &this->c_base;
-    
-    if ((sc = (*cm->cm_create)(this)) == NULL) 
-        return (NULL);
-
-    sc->sc_sock_rmt = sock_rmt;
-    sc->sc_sock_srv = sock_srv;
-    sc->sc_pamc.appdata_ptr = sc;
-    sc->sc_pamc.conv = c_authenticator_conv;
-/*
- * Release stalled execution.
- */        
-    (void)(*cm->cm_wakeup)(cm, sc);
-
-#ifdef C_OBJ_DEBUG        
-syslog(LOG_DEBUG, "%s\n", __func__);
-#endif /* C_OBJ_DEBUG */
-
-    return (&sc->sc_thr);
-}
-
-/*
- * Wrapper suspends execution of calling pthread(3).
+ * By pam_vpromt(3) called conversation routine.
+ * This event takes place during runtime of by
+ * pam_authenticate(3) called pam_get_authtok(3).
  */
 static int 
-c_authenticator_join(void *arg) 
+c_authenticator_conv(int num_msg, const struct pam_message **msg, 
+        struct pam_response **resp, void *data) 
 {
-    struct c_thr *thr;
-    void *eval;
+    struct ca_softc *sc = NULL;
+    int pam_err = PAM_AUTH_ERR;
+    int p = 1, q, i, style, j;
+    struct pam_response *tok;
     
-    if ((thr = arg) == NULL)
-        return (-1);
-    
-    eval = NULL;
-    
-    return (pthread_join(thr->ct_tid, &eval));
-}
+    if ((sc = data) == NULL)
+        p -= 2;
 
+    if ((q = num_msg) == p) {
+        if ((tok = calloc(q, sizeof(*tok))) == NULL)
+            q = 0;
+    } else 
+        q = 0;
+        
+    for (i = 0; i < q; ++i) {
+        style = msg[i]->msg_style;
+    
+        switch (style) {
+        case PAM_PROMPT_ECHO_OFF:
+        case PAM_PROMPT_ECHO_ON:
+        case PAM_ERROR_MSG:
+        case PAM_TEXT_INFO:
+            break;
+        default:
+            style = -1;
+            break;
+        }    
+        
+        if (style < 0)
+            break; 
+                    
+        c_msg_prepare(msg[i]->msg, C_AUTHENTICATOR_AUTH_NAK, 
+            sc->sc_id, &sc->sc_buf);
 /*
- * Dtor.
- */
-static int 
-c_authenticator_destroy(void *arg) 
-{
-    struct c_thr *thr;
-    struct c_class *this;
-    struct c_methods *cm;
+ * Request PAM_AUTHTOK.
+ */                
+        if (c_msg_fn(c_msg_send, sc->sc_sock_rmt, &sc->sc_buf) < 0)
+            break;
+/*
+ * Await response from applicant.
+ */    
+        if (c_msg_fn(c_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0)
+            break;
     
-    if ((thr = arg) == NULL)
-        return (-1);
+        if (sc->sc_buf.msg_id != sc->sc_id)    
+            break;    
+            
+        if (sc->sc_buf.msg_code != C_AUTHENTICATOR_AUTH_REQ)
+            break;
     
-    this = &c_authenticator_class;
-    cm = &this->c_base;
-    
-#ifdef C_OBJ_DEBUG        
-syslog(LOG_DEBUG, "%s\n", __func__);
+        if ((tok[i].resp = calloc(1, C_NMAX + 1)) == NULL) 
+            break;
+            
+#ifdef C_OBJ_DEBUG
+syslog(LOG_DEBUG, "%s: rx: %s\n", __func__, sc->sc_buf.msg_tok);    
 #endif /* C_OBJ_DEBUG */    
-
-    return ((*cm->cm_destroy)(this, thr));
+                
+        (void)strncpy(tok[i].resp, sc->sc_buf.msg_tok, C_NMAX);
+        (void)memset(&sc->sc_buf, 0, sizeof(sc->sc_buf));
+    }
+    
+    if (i < q) {
+/*
+ * Cleanup, if something went wrong.
+ */
+        for (j = i, i = 0; i < j; ++i) { 
+            (void)memset(tok[i].resp, 0, C_NMAX);
+            free(tok[i].resp);
+            tok[i].resp = NULL;
+        }
+        (void)memset(tok, 0, q * sizeof(*tok));
+        free(tok);
+        tok = NULL;
+    } else {
+/*
+ * Self explanatory.
+ */        
+        if (i > 0 && p > 0) 
+            pam_err = PAM_SUCCESS;    
+    }    
+    *resp = tok;
+    return (pam_err);
 }
-
-/******************************************************************************
- * Private methods, implementing pthread(3) life-cycle.
- ******************************************************************************/
 
 /*
  * By pthread_create(3) called start_routine.
@@ -476,98 +493,77 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 }
 
 /******************************************************************************
- * Subr.
+ * Public methods.
  ******************************************************************************/
 
 /*
- * By pam_vpromt(3) called conversation routine.
- * This event takes place during runtime of by
- * pam_authenticate(3) called pam_get_authtok(3).
+ * Ctor.
+ */
+static void *
+c_authenticator_create(int sock_srv, int sock_rmt) 
+{
+    struct c_class *this;
+    struct c_methods *cm;
+    struct ca_softc *sc;
+    
+    this = &c_authenticator_class;
+    cm = &this->c_base;
+    
+    if ((sc = (*cm->cm_create)(this)) == NULL) 
+        return (NULL);
+
+    sc->sc_sock_rmt = sock_rmt;
+    sc->sc_sock_srv = sock_srv;
+    sc->sc_pamc.appdata_ptr = sc;
+    sc->sc_pamc.conv = c_authenticator_conv;
+/*
+ * Release stalled execution.
+ */        
+    (void)(*cm->cm_wakeup)(cm, sc);
+
+#ifdef C_OBJ_DEBUG        
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* C_OBJ_DEBUG */
+
+    return (&sc->sc_thr);
+}
+
+/*
+ * Wrapper suspends execution of calling pthread(3).
  */
 static int 
-c_authenticator_conv(int num_msg, const struct pam_message **msg, 
-        struct pam_response **resp, void *data) 
+c_authenticator_join(void *arg) 
 {
-    struct ca_softc *sc = NULL;
-    int pam_err = PAM_AUTH_ERR;
-    int p = 1, q, i, style, j;
-    struct pam_response *tok;
+    struct c_thr *thr;
+    void *eval;
     
-    if ((sc = data) == NULL)
-        p -= 2;
+    if ((thr = arg) == NULL)
+        return (-1);
+    
+    eval = NULL;
+    
+    return (pthread_join(thr->ct_tid, &eval));
+}
 
-    if ((q = num_msg) == p) {
-        if ((tok = calloc(q, sizeof(*tok))) == NULL)
-            q = 0;
-    } else 
-        q = 0;
-        
-    for (i = 0; i < q; ++i) {
-        style = msg[i]->msg_style;
-    
-        switch (style) {
-        case PAM_PROMPT_ECHO_OFF:
-        case PAM_PROMPT_ECHO_ON:
-        case PAM_ERROR_MSG:
-        case PAM_TEXT_INFO:
-            break;
-        default:
-            style = -1;
-            break;
-        }    
-        
-        if (style < 0)
-            break; 
-                    
-        c_msg_prepare(msg[i]->msg, C_AUTHENTICATOR_AUTH_NAK, 
-            sc->sc_id, &sc->sc_buf);
 /*
- * Request PAM_AUTHTOK.
- */                
-        if (c_msg_fn(c_msg_send, sc->sc_sock_rmt, &sc->sc_buf) < 0)
-            break;
-/*
- * Await response from applicant.
- */    
-        if (c_msg_fn(c_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0)
-            break;
-    
-        if (sc->sc_buf.msg_id != sc->sc_id)    
-            break;    
-            
-        if (sc->sc_buf.msg_code != C_AUTHENTICATOR_AUTH_REQ)
-            break;
-    
-        if ((tok[i].resp = calloc(1, C_NMAX + 1)) == NULL) 
-            break;
-            
-#ifdef C_OBJ_DEBUG
-syslog(LOG_DEBUG, "%s: rx: %s\n", __func__, sc->sc_buf.msg_tok);    
-#endif /* C_OBJ_DEBUG */    
-                
-        (void)strncpy(tok[i].resp, sc->sc_buf.msg_tok, C_NMAX);
-        (void)memset(&sc->sc_buf, 0, sizeof(sc->sc_buf));
-    }
-    
-    if (i < q) {
-/*
- * Cleanup, if something went wrong.
+ * Dtor.
  */
-        for (j = i, i = 0; i < j; ++i) { 
-            (void)memset(tok[i].resp, 0, C_NMAX);
-            free(tok[i].resp);
-            tok[i].resp = NULL;
-        }
-        (void)memset(tok, 0, q * sizeof(*tok));
-        free(tok);
-        tok = NULL;
-    } else {
-/*
- * Self explanatory.
- */        
-        if (i > 0 && p > 0) 
-            pam_err = PAM_SUCCESS;    
-    }    
-    *resp = tok;
-    return (pam_err);
+static int 
+c_authenticator_destroy(void *arg) 
+{
+    struct c_thr *thr;
+    struct c_class *this;
+    struct c_methods *cm;
+    
+    if ((thr = arg) == NULL)
+        return (-1);
+    
+    this = &c_authenticator_class;
+    cm = &this->c_base;
+    
+#ifdef C_OBJ_DEBUG        
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* C_OBJ_DEBUG */    
+
+    return ((*cm->cm_destroy)(this, thr));
 }

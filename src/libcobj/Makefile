@@ -34,11 +34,13 @@ SHLIB_MAJOR=1
 SHLIB_MINOR=0
 
 SRCS=	c_obj.c \
+		c_obj_db.c \
 		c_msg.c \
 		c_authenticator.c \
 		c_signal.c 
 
 INCS=	c_obj.h \
+        c_obj_db.h \
 		c_authenticator.h \
 		c_signal.h
 
