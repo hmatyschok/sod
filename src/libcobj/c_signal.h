@@ -2,7 +2,7 @@
  * Copyright (c) 2016 Henning Matyschok
  *
  * Redistribution and use in source and binary forms, with or without
- * modific_signaltion, are permitted provided that the following conditions
+ * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
@@ -24,27 +24,27 @@
  * 
  * version=0.2
  */
-
+ 
 #ifndef _C_SIGNAL_H_
-#define	_C_SIGNAL_H_
+#define    _C_SIGNAL_H_
 
-typedef void * 	(*c_signal_create_t)(void);
+typedef void *     (*c_signal_create_t)(void);
 typedef int     (*c_signal_sigmask_t)(int, void *);
-typedef int 	(*c_signal_destroy_t)(void *);
+typedef int     (*c_signal_destroy_t)(void *);
 
 /*
  * Public interface.
  */
 
 struct c_signal {
-	c_signal_create_t 	c_signal_create;
-	c_signal_sigmask_t       c_signal_sigmask;
-	c_signal_destroy_t 	c_signal_destroy;
+    c_signal_create_t     c_signal_create;
+    c_signal_sigmask_t       c_signal_sigmask;
+    c_signal_destroy_t     c_signal_destroy;
 };
 
 __BEGIN_DECLS
-struct c_signal * 	c_signal_class_init(void);
-int 	c_signal_class_fini(void);
+struct c_signal *     c_signal_class_init(void);
+int     c_signal_class_fini(void);
 __END_DECLS
 
 #endif /* _C_SIGNAL_H_ */

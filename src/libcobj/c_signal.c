@@ -40,38 +40,38 @@
  */
 
 struct c_signal_softc {
-	struct c_thr 	sc_thr; 	/* binding, pthread(3) */
-#define sc_id 	sc_thr.ct_co.co_id
-#define sc_len 	sc_thr.ct_co.co_len	
-	struct sigaction    sc_sigaction;
-	sigset_t    sc_sigset;
+    struct c_thr     sc_thr;     /* binding, pthread(3) */
+#define sc_id     sc_thr.ct_co.co_id
+#define sc_len     sc_thr.ct_co.co_len    
+    struct sigaction    sc_sigaction;
+    sigset_t    sc_sigset;
 };
-#define C_SIGNAL_CLASS 	1464266531
+#define C_SIGNAL_CLASS     1464266531
 #define C_SIGNAL_LEN (sizeof(struct c_signal_softc))
 
-static void * 	c_signal_start(void *); 
+static void *     c_signal_start(void *); 
 static int     c_signal_stop(void *);
 
-static void * 	c_signal_create(void);
-static int 	c_signal_sigmask(int, void *);
-static int 	c_signal_destroy(void *); 
+static void *     c_signal_create(void);
+static int     c_signal_sigmask(int, void *);
+static int     c_signal_destroy(void *); 
 
 /******************************************************************************
  * Class-attributes.
  ******************************************************************************/
  
 static struct c_signal c_signal_methods = {
-	.c_signal_create 		= c_signal_create,
-	.c_signal_sigmask        = c_signal_sigmask,
-	.c_signal_destroy 	= c_signal_destroy,
+    .c_signal_create         = c_signal_create,
+    .c_signal_sigmask        = c_signal_sigmask,
+    .c_signal_destroy     = c_signal_destroy,
 };
 
 static struct c_class c_signal_class = {
-	.c_co = {
-		.co_id 		= C_SIGNAL_CLASS,
-		.co_len 		= C_SIGNAL_LEN,
-	},
-	.c_public 		= &c_signal_methods,
+    .c_co = {
+        .co_id         = C_SIGNAL_CLASS,
+        .co_len         = C_SIGNAL_LEN,
+    },
+    .c_public         = &c_signal_methods,
 };
 
 /******************************************************************************
@@ -85,21 +85,21 @@ static struct c_class c_signal_class = {
 struct c_signal * 
 c_signal_class_init(void)
 {
-	struct c_class *this;
-	struct c_methods *cm;
+    struct c_class *this;
+    struct c_methods *cm;
 
-	this = &c_signal_class;
+    this = &c_signal_class;
 
-	if ((cm = c_base_class_init()) == NULL)
-		return (NULL);
-	
-	if ((cm = (*cm->cm_init)(this)) == NULL)
-		return (NULL);
+    if ((cm = c_base_class_init()) == NULL)
+        return (NULL);
+    
+    if ((cm = (*cm->cm_init)(this)) == NULL)
+        return (NULL);
 
-	cm->cm_start = c_signal_start;
-	cm->cm_stop = c_signal_stop;
-	
-	return (this->c_public);	
+    cm->cm_start = c_signal_start;
+    cm->cm_stop = c_signal_stop;
+    
+    return (this->c_public);    
 }
 
 /*
@@ -109,13 +109,13 @@ c_signal_class_init(void)
 int  
 c_signal_class_fini(void)
 {
-	struct c_class *this;
-	struct c_methods *cm;
+    struct c_class *this;
+    struct c_methods *cm;
 
-	this = &c_signal_class;
-	cm = &this->c_base;
-	
-	return ((*cm->cm_fini)(this));	
+    this = &c_signal_class;
+    cm = &this->c_base;
+    
+    return ((*cm->cm_fini)(this));    
 }
 
 /******************************************************************************
@@ -128,24 +128,24 @@ c_signal_class_fini(void)
 static void *
 c_signal_create(void) 
 {
-	struct c_class *this;
-	struct c_methods *cm;
-	struct c_signal_softc *sc;
+    struct c_class *this;
+    struct c_methods *cm;
+    struct c_signal_softc *sc;
 
-	this = &c_signal_class;
-	cm = &this->c_base;
-	
-	if ((sc = (*cm->cm_create)(this)) == NULL)
-	    goto bad;
-	
-	if (sigemptyset(&sc->sc_sigaction.sa_mask) < 0)
-	    goto bad1;
-	
-	if (sigfillset(&sc->sc_sigset) < 0)
-	    goto bad1;
-	
-	return (&sc->sc_thr);
-bad1:	
+    this = &c_signal_class;
+    cm = &this->c_base;
+    
+    if ((sc = (*cm->cm_create)(this)) == NULL)
+        goto bad;
+    
+    if (sigemptyset(&sc->sc_sigaction.sa_mask) < 0)
+        goto bad1;
+    
+    if (sigfillset(&sc->sc_sigset) < 0)
+        goto bad1;
+    
+    return (&sc->sc_thr);
+bad1:    
     (void)(*cm->cm_destroy)(this, sc);
 bad:
     return (NULL);
@@ -160,25 +160,25 @@ c_signal_sigmask(int how, void *arg)
     struct c_thr *thr;
     struct c_class *this;
     struct c_signal_softc *sc;
-	
-	if ((thr = arg) == NULL)
-	    return (-1);
     
-	this = &c_signal_class;
-	sc = c_cache_get(&this->c_instances, thr);
-	
-	if (sc == NULL)
-	    return (-1);
-	
-	switch (how) {
-	case SIG_BLOCK:
-	case SIG_UNBLOCK:
-	case SIG_SETMASK:
-		break;
-	default:	
-		return (-1);
-	}	
-	return (pthread_sigmask(how, &sc->sc_sigset, NULL));
+    if ((thr = arg) == NULL)
+        return (-1);
+    
+    this = &c_signal_class;
+    sc = c_cache_get(&this->c_instances, thr);
+    
+    if (sc == NULL)
+        return (-1);
+    
+    switch (how) {
+    case SIG_BLOCK:
+    case SIG_UNBLOCK:
+    case SIG_SETMASK:
+        break;
+    default:    
+        return (-1);
+    }    
+    return (pthread_sigmask(how, &sc->sc_sigset, NULL));
 }
 
 /*
@@ -187,14 +187,14 @@ c_signal_sigmask(int how, void *arg)
 static int 
 c_signal_destroy(void *arg) 
 {
-	struct c_thr *thr;
-	struct c_class *this;
-	struct c_methods *cm;
-	
-	this = &c_signal_class;
-	cm = &this->c_base;
-	
-	return ((*cm->cm_destroy)(this, thr));
+    struct c_thr *thr;
+    struct c_class *this;
+    struct c_methods *cm;
+    
+    this = &c_signal_class;
+    cm = &this->c_base;
+    
+    return ((*cm->cm_destroy)(this, thr));
 }
 
 /******************************************************************************
@@ -208,30 +208,30 @@ static void *
 c_signal_start(void *arg)
 {
     struct c_signal_softc *sc;
-	int sig;
-	
-	if ((sc = arg) == NULL)
-	    goto out;
-			
-	for (;;) {
-		if (sigwait(&sc->sc_sigset, &sig) != 0)
-			errx(EX_OSERR, "Can't select signal set");
+    int sig;
+    
+    if ((sc = arg) == NULL)
+        goto out;
+            
+    for (;;) {
+        if (sigwait(&sc->sc_sigset, &sig) != 0)
+            errx(EX_OSERR, "Can't select signal set");
 /*
  * XXX: this will be replaced by callback...
  */
-		switch (sig) {
-		case SIGHUP:
-		case SIGINT:
-		case SIGKILL:	
-		case SIGTERM:
-			exit(EX_OK);
-			break;
-		default:	
-			break;
-		}	
-	}
-out:	
-	return (NULL);
+        switch (sig) {
+        case SIGHUP:
+        case SIGINT:
+        case SIGKILL:    
+        case SIGTERM:
+            exit(EX_OK);
+            break;
+        default:    
+            break;
+        }    
+    }
+out:    
+    return (NULL);
 }
  
 /*

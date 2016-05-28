@@ -42,23 +42,23 @@
  * Simple test.
  */
  
-#define SOD_SOCK_FILE 	"/var/run/sod.sock"
+#define SOD_SOCK_FILE     "/var/run/sod.sock"
 
 struct sod_test_args {
-    char 	sta_user[C_NMAX + 1];
-    char 	sta_pw[C_NMAX + 1];
+    char     sta_user[C_NMAX + 1];
+    char     sta_pw[C_NMAX + 1];
 };
 
-static int 	max_arg = 3;
-static char 	*sock_file = SOD_SOCK_FILE;
+static int     max_arg = 3;
+static char     *sock_file = SOD_SOCK_FILE;
 
 static char     cmd[C_NMAX + 1];
 
-static struct sockaddr_storage 	sap;
+static struct sockaddr_storage     sap;
 static struct sockaddr_un *sun;
 static size_t len;
 
-static pthread_t 	tid;
+static pthread_t     tid;
 
 /*
  * By pthread(3) called start routine.
@@ -66,164 +66,164 @@ static pthread_t 	tid;
 void * 
 sod_test(void *arg)
 {
-	struct sod_test_args *sta;
-	struct c_msg *buf;
-	int s, state;
-	long id;
-	char *tok;
-	
-	if ((sta = arg) == NULL)
-	    goto bad;
+    struct sod_test_args *sta;
+    struct c_msg *buf;
+    int s, state;
+    long id;
+    char *tok;
+    
+    if ((sta = arg) == NULL)
+        goto bad;
 /*
  * Connect with sod instance.
- */	
-	if ((s = socket(sun->sun_family, SOCK_STREAM, 0)) < 0) 
-		goto bad;
-	
-	if (connect(s, (struct sockaddr *)sun, len) < 0)
-		goto bad1;
-		
-	if ((buf = c_msg_alloc()) == NULL)
-	    goto bad2;
-	
-	state = C_AUTHENTICATOR_AUTH_REQ;
-	id = buf->msg_id;	
-	tok = sta->sta_user;
-	
-	while (state) {
+ */    
+    if ((s = socket(sun->sun_family, SOCK_STREAM, 0)) < 0) 
+        goto bad;
+    
+    if (connect(s, (struct sockaddr *)sun, len) < 0)
+        goto bad1;
+        
+    if ((buf = c_msg_alloc()) == NULL)
+        goto bad2;
+    
+    state = C_AUTHENTICATOR_AUTH_REQ;
+    id = buf->msg_id;    
+    tok = sta->sta_user;
+    
+    while (state) {
 /*
  * Select action.
  */
-		switch (state) {	
-		case C_AUTHENTICATOR_AUTH_REQ:
+        switch (state) {    
+        case C_AUTHENTICATOR_AUTH_REQ:
 /*
  * Create message.
  */ 
-			c_msg_prepare(tok, state, id, buf);
+            c_msg_prepare(tok, state, id, buf);
 /*
  * Send message.
- */ 		
-			if (c_msg_fn(c_msg_send, s, buf) < 0) {
-				syslog(LOG_DEBUG, 
-					"Can't send PAM_USER as request\n");
-				state = 0;
-				break;
-			}
-			syslog(LOG_DEBUG, 
-				"tx: C_AUTHENTICATOR_AUTH_REQ: %s\n", 
-				buf->msg_tok);		
+ */         
+            if (c_msg_fn(c_msg_send, s, buf) < 0) {
+                syslog(LOG_DEBUG, 
+                    "Can't send PAM_USER as request\n");
+                state = 0;
+                break;
+            }
+            syslog(LOG_DEBUG, 
+                "tx: C_AUTHENTICATOR_AUTH_REQ: %s\n", 
+                buf->msg_tok);        
 /*
  * Await response.
- */			
-			if (c_msg_fn(c_msg_recv, s, buf) < 0) {
-				syslog(LOG_DEBUG, 
-					"Can't receive "
-					"C_AUTHENTICATOR_AUTH_NAK "
-					"as response");
-				state = 0;
-				break;
-			}
-			
-			if (tok == sta->sta_user) {
+ */            
+            if (c_msg_fn(c_msg_recv, s, buf) < 0) {
+                syslog(LOG_DEBUG, 
+                    "Can't receive "
+                    "C_AUTHENTICATOR_AUTH_NAK "
+                    "as response");
+                state = 0;
+                break;
+            }
+            
+            if (tok == sta->sta_user) {
 /*
  * Cache for conversation need credentials.
  */
-				id = buf->msg_id;
-			} 
-				
-			if (buf->msg_id != id) {
-				syslog(LOG_DEBUG, "Invalid tid received");
-				state = 0;
-				break;
-			}
+                id = buf->msg_id;
+            } 
+                
+            if (buf->msg_id != id) {
+                syslog(LOG_DEBUG, "Invalid tid received");
+                state = 0;
+                break;
+            }
 /*
  * Determine state transition.
  */
-			state = buf->msg_code;
-			break;
-		case C_AUTHENTICATOR_AUTH_NAK:
-			syslog(LOG_DEBUG, 
-				"rx: C_AUTHENTICATOR_AUTH_NAK: %s", 
-				buf->msg_tok);
+            state = buf->msg_code;
+            break;
+        case C_AUTHENTICATOR_AUTH_NAK:
+            syslog(LOG_DEBUG, 
+                "rx: C_AUTHENTICATOR_AUTH_NAK: %s", 
+                buf->msg_tok);
 /*
  * Select for response need data.
- */		
-			state = C_AUTHENTICATOR_AUTH_REQ; 
-			tok = sta->sta_pw;	
-			break;
-		case C_AUTHENTICATOR_AUTH_ACK:
-			syslog(LOG_DEBUG, 
-				"rx: C_AUTHENTICATOR_AUTH_ACK: PAM_SUCCESS\n");
-			state = 0;
-			break;
-		case C_AUTHENTICATOR_AUTH_REJ:
-			syslog(LOG_DEBUG, 
-				"rx: C_AUTHENTICATOR_AUTH_REJ: PAM_AUTH_ERR\n");
-			state = 0;
-			break;
-		default:
-			state = 0;
-			break;
-		}
-	}
+ */        
+            state = C_AUTHENTICATOR_AUTH_REQ; 
+            tok = sta->sta_pw;    
+            break;
+        case C_AUTHENTICATOR_AUTH_ACK:
+            syslog(LOG_DEBUG, 
+                "rx: C_AUTHENTICATOR_AUTH_ACK: PAM_SUCCESS\n");
+            state = 0;
+            break;
+        case C_AUTHENTICATOR_AUTH_REJ:
+            syslog(LOG_DEBUG, 
+                "rx: C_AUTHENTICATOR_AUTH_REJ: PAM_AUTH_ERR\n");
+            state = 0;
+            break;
+        default:
+            state = 0;
+            break;
+        }
+    }
 bad2:
-	c_msg_free(buf);
+    c_msg_free(buf);
 bad1:
     (void)close(s);
 bad:
-	return (NULL);
+    return (NULL);
 }
 
 /*
  * Establish connection with sod.
  */
-int	
+int    
 main(int argc, char **argv) 
 {
-	void *rv = NULL;
-	struct sigaction sa;
-	struct sod_test_args sta;
-	
-	sa.sa_handler = SIG_IGN;
-	(void)sigemptyset(&sa.sa_mask);
-	sa.sa_flags = 0;
+    void *rv = NULL;
+    struct sigaction sa;
+    struct sod_test_args sta;
+    
+    sa.sa_handler = SIG_IGN;
+    (void)sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
 
-	if (sigaction(SIGCHLD, &sa, NULL) < 0)
-		errx(EX_OSERR, "Can't disable SIGCHLD");
+    if (sigaction(SIGCHLD, &sa, NULL) < 0)
+        errx(EX_OSERR, "Can't disable SIGCHLD");
 
-	(void)strncpy(cmd, argv[0], C_NMAX);
-		
-	if (argc != max_arg)
-		errx(EX_USAGE, "\nusage: %s user pw\n", argv[0]);
+    (void)strncpy(cmd, argv[0], C_NMAX);
+        
+    if (argc != max_arg)
+        errx(EX_USAGE, "\nusage: %s user pw\n", argv[0]);
 /*
  * Cache arguments and prepare buffer.
- */		
-	(void)memset(&sta, 0, sizeof(sta));
-	(void)strncpy(sta.sta_user, argv[1], C_NMAX);
-	(void)strncpy(sta.sta_pw, argv[2], C_NMAX);	
-	(void)memset(&sap, 0, sizeof(sap));
+ */        
+    (void)memset(&sta, 0, sizeof(sta));
+    (void)strncpy(sta.sta_user, argv[1], C_NMAX);
+    (void)strncpy(sta.sta_pw, argv[2], C_NMAX);    
+    (void)memset(&sap, 0, sizeof(sap));
 /*
  * Create socket address.
- */	
+ */    
     sun = (struct sockaddr_un *)&sap;
-	sun->sun_family = AF_UNIX;
-	len = sizeof(sun->sun_path);
-	
-	(void)strncpy(sun->sun_path, sock_file, len - 1);
+    sun->sun_family = AF_UNIX;
+    len = sizeof(sun->sun_path);
+    
+    (void)strncpy(sun->sun_path, sock_file, len - 1);
 
-	len += offsetof(struct sockaddr_un, sun_path);
+    len += offsetof(struct sockaddr_un, sun_path);
 /*
  * Execute.
  */ 
-	if (pthread_create(&tid, NULL, sod_test, &sta) != 0)
-		errx(EX_OSERR, "Can't create pthread(3)");
+    if (pthread_create(&tid, NULL, sod_test, &sta) != 0)
+        errx(EX_OSERR, "Can't create pthread(3)");
 /*
  * Serialize, if possible.
- */	
-	if (pthread_join(tid, &rv) != 0)
-		errx(EX_OSERR, "Can't serialize execution of "
-			"former created pthread(3)"); 
-			
-	exit(EX_OK);
+ */    
+    if (pthread_join(tid, &rv) != 0)
+        errx(EX_OSERR, "Can't serialize execution of "
+            "former created pthread(3)"); 
+            
+    exit(EX_OK);
 }
 

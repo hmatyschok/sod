@@ -26,34 +26,34 @@
  */
 
 #ifndef _C_AUTHENTICATOR_H_
-#define	_C_AUTHENTICATOR_H_
+#define    _C_AUTHENTICATOR_H_
 
-#define C_AUTHENTICATOR_AUTH_REQ 	0x00000001
-#define C_AUTHENTICATOR_TERM_REQ 	0x00000002
+#define C_AUTHENTICATOR_AUTH_REQ     0x00000001
+#define C_AUTHENTICATOR_TERM_REQ     0x00000002
 
-#define C_AUTHENTICATOR_AUTH_ACK 	(C_AUTHENTICATOR_AUTH_REQ|C_MSG_ACK)
-#define C_AUTHENTICATOR_AUTH_NAK 	(C_AUTHENTICATOR_AUTH_REQ|C_MSG_NAK)
-#define C_AUTHENTICATOR_AUTH_REJ 	(C_AUTHENTICATOR_AUTH_REQ|C_MSG_REJ)
-#define	C_AUTHENTICATOR_TERM_ACK 	(C_AUTHENTICATOR_TERM_REQ|C_MSG_ACK)
-#define C_AUTHENTICATOR_TERM_REJ 	(C_AUTHENTICATOR_TERM_REQ|C_MSG_REJ)
+#define C_AUTHENTICATOR_AUTH_ACK     (C_AUTHENTICATOR_AUTH_REQ|C_MSG_ACK)
+#define C_AUTHENTICATOR_AUTH_NAK     (C_AUTHENTICATOR_AUTH_REQ|C_MSG_NAK)
+#define C_AUTHENTICATOR_AUTH_REJ     (C_AUTHENTICATOR_AUTH_REQ|C_MSG_REJ)
+#define    C_AUTHENTICATOR_TERM_ACK     (C_AUTHENTICATOR_TERM_REQ|C_MSG_ACK)
+#define C_AUTHENTICATOR_TERM_REJ     (C_AUTHENTICATOR_TERM_REQ|C_MSG_REJ)
 
-typedef void * 	(*ca_create_t)(int, int);
+typedef void *     (*ca_create_t)(int, int);
 typedef int     (*ca_join_t)(void *);
-typedef int 	(*ca_destroy_t)(void *);
+typedef int     (*ca_destroy_t)(void *);
 
 /*
  * Public interface.
  */
 
 struct c_authenticator {
-	ca_create_t 	ca_create;
-	ca_join_t       ca_join;
-	ca_destroy_t 	ca_destroy;
+    ca_create_t     ca_create;
+    ca_join_t       ca_join;
+    ca_destroy_t     ca_destroy;
 };
 
 __BEGIN_DECLS
-struct c_authenticator * 	c_authenticator_class_init(void);
-int 	c_authenticator_class_fini(void);
+struct c_authenticator *     c_authenticator_class_init(void);
+int     c_authenticator_class_fini(void);
 __END_DECLS
 
 #endif /* _C_AUTHENTICATOR_H_ */

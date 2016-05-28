@@ -40,13 +40,13 @@
 struct c_msg * 
 c_msg_alloc(void)
 {
-	struct c_msg *msg;
-	
-	if ((msg = calloc(1, C_MSG_LEN)) != NULL) {
-		msg->msg_id = C_MSG;
-		msg->msg_len = C_MSG_LEN;
-	}
-	return (msg);
+    struct c_msg *msg;
+    
+    if ((msg = calloc(1, C_MSG_LEN)) != NULL) {
+        msg->msg_id = C_MSG;
+        msg->msg_len = C_MSG_LEN;
+    }
+    return (msg);
 }
 
 /*
@@ -55,15 +55,15 @@ c_msg_alloc(void)
 void 
 c_msg_prepare(const char *s, uint32_t code, long id, struct c_msg *msg)
 {
-	if (msg != NULL) {
-		(void)memset(msg, 0, sizeof(*msg));
-	
-		msg->msg_id = id;
-		msg->msg_code = code;
-	
-		if (s != NULL) 
-			(void)strncpy(msg->msg_tok, s, C_NMAX);
-	}
+    if (msg != NULL) {
+        (void)memset(msg, 0, sizeof(*msg));
+    
+        msg->msg_id = id;
+        msg->msg_code = code;
+    
+        if (s != NULL) 
+            (void)strncpy(msg->msg_tok, s, C_NMAX);
+    }
 }
 
 /*
@@ -72,7 +72,7 @@ c_msg_prepare(const char *s, uint32_t code, long id, struct c_msg *msg)
 ssize_t 
 c_msg_send(int s, struct msghdr *mh, int flags)
 {
-	return (sendmsg(s, mh, flags));
+    return (sendmsg(s, mh, flags));
 }
 
 /*
@@ -81,7 +81,7 @@ c_msg_send(int s, struct msghdr *mh, int flags)
 ssize_t 
 c_msg_recv(int s, struct msghdr *mh, int flags)
 {
-	return (recvmsg(s, mh, flags));
+    return (recvmsg(s, mh, flags));
 }
 
 /* 
@@ -90,33 +90,33 @@ c_msg_recv(int s, struct msghdr *mh, int flags)
 int
 c_msg_fn(c_msg_fn_t fn, int s, struct c_msg *msg)
 {
-	struct iovec vec;
-	struct msghdr mh;
-	int eval = -1;
+    struct iovec vec;
+    struct msghdr mh;
+    int eval = -1;
 
-	if (msg == NULL)
-		goto out;
+    if (msg == NULL)
+        goto out;
 
-	if (fn == NULL)
-		goto out;
+    if (fn == NULL)
+        goto out;
 
-	if (msg->msg_len != C_MSG_LEN)
-		goto out;
+    if (msg->msg_len != C_MSG_LEN)
+        goto out;
 
-	if (fn == c_msg_recv || fn == c_msg_send) {
-		vec.iov_base = msg;
-		vec.iov_len = msg->msg_len;
-	
-		(void)memset(&msg, 0, sizeof(mh));
-	
-		mh.msg_iov = &vec;
-		mh.msg_iovlen = 1;			
-		
-		if ((*fn)(s, &mh, 0) == msg->msg_len)
-			eval = 0;	
-	}
+    if (fn == c_msg_recv || fn == c_msg_send) {
+        vec.iov_base = msg;
+        vec.iov_len = msg->msg_len;
+    
+        (void)memset(&msg, 0, sizeof(mh));
+    
+        mh.msg_iov = &vec;
+        mh.msg_iovlen = 1;            
+        
+        if ((*fn)(s, &mh, 0) == msg->msg_len)
+            eval = 0;    
+    }
 out:
-	return (eval);
+    return (eval);
 }
 
 /*
@@ -126,8 +126,8 @@ out:
 void 
 c_msg_free(struct c_msg *msg)
 {
-	if (msg != NULL) {
-		(void)memset(msg, 0, sizeof(*msg));
-		free(msg);
-	}
+    if (msg != NULL) {
+        (void)memset(msg, 0, sizeof(*msg));
+        free(msg);
+    }
 }
