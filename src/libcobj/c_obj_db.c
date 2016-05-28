@@ -40,9 +40,6 @@ struct c_obj_db_softc {
     struct c_thr     sc_thr;     /* binding, pthread(3) */
 #define sc_id     sc_thr.ct_co.co_id
 #define sc_len     sc_thr.ct_co.co_len    
-    c_obj_fn_t      sc_fn;
-    void        *sc_co0;
-    void        *sc_co1;
     DB  *sc_db;
 };
 #define C_OBJ_DB_CLASS     1464425467
@@ -149,8 +146,6 @@ c_obj_db_start(void *arg)
     for (;;) {
         if ((*cm->cm_sleep)(cm, sc))
             (void)(*cm->cm_destroy)(this, sc);
-
-        sc->sc_co1 = c_obj_fn(sc->sc_fn, sc->sc_db, sc->sc_co0); 
     }
 out:    
     return (NULL);
@@ -293,17 +288,12 @@ c_obj_db_add(void *arg0, void *arg1)
     
     if (sc == NULL)
         return (NULL);
-    
-    if ((sc->sc_co0 = arg0) == NULL)
-        return (NULL);
-    
-    sc->sc_fn = c_obj_add;
 /*
  * Release stalled execution.
  */ 
     (void)(*cm->cm_wakeup)(cm, sc);
  
-    return (sc->sc_co1);
+    return (c_obj_fn(c_obj_add, sc->sc_db, arg0));
 }
 
 /*
@@ -318,21 +308,17 @@ c_obj_db_get(void *arg0, void *arg1)
  
     this = &c_obj_db_class;
     cm = &this->c_base;
+    
     sc = (*cm->cm_get)(&this->c_instances, arg1);
     
     if (sc == NULL)
         return (NULL);
-    
-    if ((sc->sc_co0 = arg0) == NULL)
-        return (NULL);
-    
-    sc->sc_fn = c_obj_get;
 /*
  * Release stalled execution.
  */ 
     (void)(*cm->cm_wakeup)(cm, sc);
  
-    return (sc->sc_co1);
+    return (c_obj_fn(c_obj_get, sc->sc_db, arg0));
 }
 
 /*
@@ -352,17 +338,12 @@ c_obj_db_del(void *arg0, void *arg1)
     
     if (sc == NULL)
         return (NULL);
-    
-    if ((sc->sc_co0 = arg0) == NULL)
-        return (NULL);
-    
-    sc->sc_fn = c_obj_del;
 /*
  * Release stalled execution.
  */ 
     (void)(*cm->cm_wakeup)(cm, sc);
  
-    return (sc->sc_co1);
+    return (c_obj_fn(c_obj_del, sc->sc_db, arg0));
 }
 
 /*
