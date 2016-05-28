@@ -37,7 +37,6 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <pthread.h>
-#include <pthread.h>
 
 #ifdef C_OBJ_DEBUG
 #include <syslog.h>
@@ -82,7 +81,8 @@ struct c_obj {
     ssize_t     co_len;
     int         co_flags;
 #define C_INIT  0x00000001    
-#define C_LOCKED    0x00000002    
+#define C_LOCKED    0x00000002
+#define C_THREAD    0x00000004    
     TAILQ_ENTRY(c_obj) co_next;
 };
 TAILQ_HEAD(c_cache, c_obj);

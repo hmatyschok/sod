@@ -37,7 +37,7 @@ typedef int     (*c_obj_db_destroy_t)(void *);
  */
 
 struct c_obj_db {
-    c_obj_db_create_t     c_obj_db_create;
+    c_obj_db_create_t     cod_create;
     c_obj_db_fn_t       c_obj_db_add;
     c_obj_db_fn_t       c_obj_db_get;
     c_obj_db_fn_t       c_obj_db_del;

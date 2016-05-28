@@ -69,6 +69,8 @@ static int     c_obj_db_destroy(void *);
 static struct c_obj_db c_obj_db_methods = {
     .c_obj_db_create         = c_obj_db_create,
     .c_obj_db_add        = c_obj_db_add,
+    .c_obj_db_get        = c_obj_db_get,
+    .c_obj_db_del        = c_obj_db_del,
     .c_obj_db_destroy     = c_obj_db_destroy,
 };
 
@@ -316,7 +318,6 @@ c_obj_db_get(void *arg0, void *arg1)
  
     this = &c_obj_db_class;
     cm = &this->c_base;
-    
     sc = (*cm->cm_get)(&this->c_instances, arg1);
     
     if (sc == NULL)

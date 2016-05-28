@@ -439,6 +439,10 @@ c_thr_sleep(void *cm0, void *arg)
         return (-1);
     
     cm = (cm0) ? cm0 : &c_base_class.c_base;
+ 
+#ifdef C_OBJ_DEBUG        
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* C_OBJ_DEBUG */ 
     
     (void)(*cm->cm_lock)(arg);
     (void)pthread_cond_wait(&thr->ct_cv, &thr->ct_mtx);
@@ -462,6 +466,10 @@ c_thr_wakeup(void *cm0, void *arg)
     
     (void)pthread_cond_signal(&thr->ct_cv);
     (void)(*cm->cm_unlock)(arg);
+
+#ifdef C_OBJ_DEBUG        
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* C_OBJ_DEBUG */ 
 
     return (0);
 }
