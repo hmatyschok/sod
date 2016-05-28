@@ -191,6 +191,9 @@ c_signal_destroy(void *arg)
     struct c_class *this;
     struct c_methods *cm;
     
+    if ((thr = arg) == NULL)
+        return (-1);
+    
     this = &c_signal_class;
     cm = &this->c_base;
     

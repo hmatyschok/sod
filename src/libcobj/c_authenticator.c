@@ -225,6 +225,9 @@ c_authenticator_destroy(void *arg)
     struct c_class *this;
     struct c_methods *cm;
     
+    if ((thr = arg) == NULL)
+        return (-1);
+    
     this = &c_authenticator_class;
     cm = &this->c_base;
     
@@ -257,7 +260,7 @@ c_authenticator_start(void *arg)
     if ((sc = arg) == NULL)
         goto out;
     
-    if ((*cm->cm_sleep)(cm, &sc->sc_thr) == 0)
+    if ((*cm->cm_sleep)(cm, sc) == 0)
         fn = (ca_state_t)c_authenticator_establish;    
 
 #ifdef C_OBJ_DEBUG        
