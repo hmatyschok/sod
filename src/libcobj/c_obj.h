@@ -45,14 +45,13 @@
 
 #define C_NMAX     127
 
-struct c_methods;
-struct c_obj;
-
 #define C_MSG_ACK     0x00000010
 #define C_MSG_NAK     0x00000020
 #define C_MSG_REJ     0x00000030
 
 typedef ssize_t     (*c_msg_fn_t)(int, struct msghdr *, int);
+
+typedef void *   (*c_obj_get_t)(void *, void *);
 
 typedef void *     (*c_init_t)(void *);
 typedef int     (*c_fini_t)(void *);
@@ -63,9 +62,9 @@ typedef void *    (*c_start_t)(void *);
 typedef int     (*c_lock_t)(void *);
 typedef int     (*c_unlock_t)(void *);
 
-typedef int     (*c_sleep_t)(struct c_methods *, void *);
-typedef int     (*c_wakeup_t)(struct c_methods *, void *);
-typedef int     (*c_wait_t)(struct c_methods *, u_int, void *);
+typedef int     (*c_sleep_t)(void *, void *);
+typedef int     (*c_wakeup_t)(void *, void *);
+typedef int     (*c_wait_t)(void *, u_int, void *);
 
 typedef int     (*c_stop_t)(void *);
 typedef int     (*c_destroy_t)(void *, void *);
@@ -110,6 +109,8 @@ struct c_methods {
     c_wait_t        cm_wait;
     c_stop_t         cm_stop;
     c_destroy_t         cm_destroy;
+    
+    c_obj_get_t    cm_get;
 };
 #define C_BASE_METHODS     1463676933
 #define C_NOP_METHODS     1463677298
@@ -170,10 +171,6 @@ struct c_msg {
 #define C_MSG_QLEN     13
 
 __BEGIN_DECLS
-void *   c_cache_add(struct c_cache *, void *);
-void *   c_cache_get(struct c_cache *, void *);
-void *   c_cache_del(struct c_cache *, void *);
-
 struct c_msg *     c_msg_alloc(void);
 void     c_msg_prepare(const char *, uint32_t, long, struct c_msg *);
 ssize_t     c_msg_send(int, struct msghdr *, int);

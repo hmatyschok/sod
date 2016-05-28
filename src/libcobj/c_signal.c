@@ -119,89 +119,7 @@ c_signal_class_fini(void)
 }
 
 /******************************************************************************
- * Public methods.
- ******************************************************************************/
-
-/*
- * Ctor.
- */
-static void *
-c_signal_create(void) 
-{
-    struct c_class *this;
-    struct c_methods *cm;
-    struct c_signal_softc *sc;
-
-    this = &c_signal_class;
-    cm = &this->c_base;
-    
-    if ((sc = (*cm->cm_create)(this)) == NULL)
-        goto bad;
-    
-    if (sigemptyset(&sc->sc_sigaction.sa_mask) < 0)
-        goto bad1;
-    
-    if (sigfillset(&sc->sc_sigset) < 0)
-        goto bad1;
-    
-    return (&sc->sc_thr);
-bad1:    
-    (void)(*cm->cm_destroy)(this, sc);
-bad:
-    return (NULL);
-}
-
-/*
- * Applies sigmask on calling pthread(3).
- */
-static int 
-c_signal_sigmask(int how, void *arg) 
-{ 
-    struct c_thr *thr;
-    struct c_class *this;
-    struct c_signal_softc *sc;
-    
-    if ((thr = arg) == NULL)
-        return (-1);
-    
-    this = &c_signal_class;
-    sc = c_cache_get(&this->c_instances, thr);
-    
-    if (sc == NULL)
-        return (-1);
-    
-    switch (how) {
-    case SIG_BLOCK:
-    case SIG_UNBLOCK:
-    case SIG_SETMASK:
-        break;
-    default:    
-        return (-1);
-    }    
-    return (pthread_sigmask(how, &sc->sc_sigset, NULL));
-}
-
-/*
- * Dtor.
- */
-static int 
-c_signal_destroy(void *arg) 
-{
-    struct c_thr *thr;
-    struct c_class *this;
-    struct c_methods *cm;
-    
-    if ((thr = arg) == NULL)
-        return (-1);
-    
-    this = &c_signal_class;
-    cm = &this->c_base;
-    
-    return ((*cm->cm_destroy)(this, thr));
-}
-
-/******************************************************************************
- * Private methods, implementing pthread(3) life-cycle.
+ * Private methods.
  ******************************************************************************/
 
 /*
@@ -245,6 +163,87 @@ c_signal_stop(void *arg)
 {
 
     return (0);
+}
+
+/******************************************************************************
+ * Public methods.
+ ******************************************************************************/
+
+/*
+ * Ctor.
+ */
+static void *
+c_signal_create(void) 
+{
+    struct c_class *this;
+    struct c_methods *cm;
+    struct c_signal_softc *sc;
+
+    this = &c_signal_class;
+    cm = &this->c_base;
+    
+    if ((sc = (*cm->cm_create)(this)) == NULL)
+        goto bad;
+    
+    if (sigemptyset(&sc->sc_sigaction.sa_mask) < 0)
+        goto bad1;
+    
+    if (sigfillset(&sc->sc_sigset) < 0)
+        goto bad1;
+    
+    return (&sc->sc_thr);
+bad1:    
+    (void)(*cm->cm_destroy)(this, sc);
+bad:
+    return (NULL);
+}
+
+/*
+ * Applies sigmask on calling pthread(3).
+ */
+static int 
+c_signal_sigmask(int how, void *arg) 
+{ 
+    struct c_class *this;
+    struct c_methods *cm;
+    struct c_signal_softc *sc;
+   
+    this = &c_signal_class;
+    cm = &this->c_base;
+  
+    sc = (*cm->cm_get)(&this->c_instances, arg);
+    
+    if (sc == NULL)
+        return (-1);
+    
+    switch (how) {
+    case SIG_BLOCK:
+    case SIG_UNBLOCK:
+    case SIG_SETMASK:
+        break;
+    default:    
+        return (-1);
+    }    
+    return (pthread_sigmask(how, &sc->sc_sigset, NULL));
+}
+
+/*
+ * Dtor.
+ */
+static int 
+c_signal_destroy(void *arg) 
+{
+    struct c_thr *thr;
+    struct c_class *this;
+    struct c_methods *cm;
+    
+    if ((thr = arg) == NULL)
+        return (-1);
+    
+    this = &c_signal_class;
+    cm = &this->c_base;
+    
+    return ((*cm->cm_destroy)(this, thr));
 }
 
 

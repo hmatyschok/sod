@@ -39,15 +39,22 @@
 static int  c_children_free(struct c_class *);
 static int  c_instances_free(struct c_class *);
 
+static void *   c_cache_add(struct c_cache *, void *);
+static void *   c_cache_get(struct c_cache *, void *);
+static void *   c_cache_del(struct c_cache *, void *);
+
 static void *    c_class_init(void *);
 static int     c_class_fini(void *);
+
 static void *     c_thr_create(void *);
 static int  c_thr_lock(void *);
 static int  c_thr_unlock(void *);
-static int  c_thr_wakeup(struct c_methods *, void *);
-static int  c_thr_sleep(struct c_methods *, void *);
-static int  c_thr_wait(struct c_methods *, u_int, void *);
+static int  c_thr_wakeup(void *, void *);
+static int  c_thr_sleep(void *, void *);
+static int  c_thr_wait(void *, u_int, void *);
 static int     c_thr_destroy(void *, void *);
+
+static void *   c_thr_get(void *, void *);
 
 static void *     c_nop_init(void *);
 static int     c_nop_fini(void *);
@@ -57,12 +64,14 @@ static void *     c_nop_start(void *);
 static int  c_nop_lock(void *);
 static int  c_nop_unlock(void *);
 
-static int  c_nop_sleep(struct c_methods *, void *);
-static int  c_nop_wakeup(struct c_methods *, void *);
-static int  c_nop_wait(struct c_methods *, u_int, void *);
+static int  c_nop_sleep(void *, void *);
+static int  c_nop_wakeup(void *, void *);
+static int  c_nop_wait(void *, u_int, void *);
 
 static int     c_nop_stop(void *);
 static int     c_nop_destroy(void *, void *);
+
+static void *   c_nop_get(void *, void *);
 
 /******************************************************************************
  * Generic class-attributes.
@@ -87,6 +96,7 @@ static struct c_methods c_nop = {
     .cm_wait        = c_nop_wait,
     .cm_stop         = c_nop_stop,
     .cm_destroy         = c_nop_destroy,
+    .cm_get         = c_nop_get,
 }; 
 
 /*
@@ -119,6 +129,8 @@ static struct c_class c_base_class = {
         .cm_wait        = c_thr_wait,
         .cm_stop         = c_nop_stop,
         .cm_destroy         = c_thr_destroy,
+       
+        .cm_get         = c_thr_get,
     },
     .c_public         = &c_nop,
 };
@@ -127,6 +139,56 @@ static struct c_class c_base_class = {
 /******************************************************************************
  * Private class-methods.
  ******************************************************************************/
+
+/*
+ * Insert object.
+ */
+static void *
+c_cache_add(struct c_cache *ch, void *arg)
+{    
+    struct c_obj *co;
+    
+    if ((co = arg) == NULL)
+        return (NULL);
+
+    TAILQ_INSERT_TAIL(ch, co, co_next);    
+    
+    return (co);
+}
+
+/*
+ * Find requested object.
+ */
+static void *     
+c_cache_get(struct c_cache *ch, void *arg)
+{    
+    struct c_obj *co, *co_tmp, *key;
+    
+    if ((key = arg) == NULL) 
+        return (NULL);
+    
+    TAILQ_FOREACH_SAFE(co, ch, co_next, co_tmp) {
+        if (co->co_id == key->co_id) 
+            break;
+    }
+    return (co);
+}
+
+/*
+ * Fetch requested object.
+ */
+static void *     
+c_cache_del(struct c_cache *ch, void *arg)
+{    
+    struct c_obj *co;
+    
+    co = c_cache_get(ch, arg);
+
+    if (co)
+        TAILQ_REMOVE(ch, co, co_next);
+           
+    return (co);
+}
 
 static int 
 c_children_free(struct c_class *cls)
@@ -368,7 +430,7 @@ c_thr_unlock(void *arg)
  * Fell asleep.
  */
 static int 
-c_thr_sleep(struct c_methods *cm0, void *arg)
+c_thr_sleep(void *cm0, void *arg)
 {
     struct c_thr *thr;
     struct c_methods *cm;
@@ -388,7 +450,7 @@ c_thr_sleep(struct c_methods *cm0, void *arg)
  * Continue stalled pthread(3) execution.
  */ 
 static int 
-c_thr_wakeup(struct c_methods *cm0, void *arg)
+c_thr_wakeup(void *cm0, void *arg)
 {
     struct c_thr *thr;
     struct c_methods *cm;
@@ -408,7 +470,7 @@ c_thr_wakeup(struct c_methods *cm0, void *arg)
  * Fell asleep for ts seconds.
  */
 static int 
-c_thr_wait(struct c_methods *cm0, u_int ts, void *arg)
+c_thr_wait(void *cm0, u_int ts, void *arg)
 {
     struct c_thr *thr;
     struct c_methods *cm;
@@ -490,59 +552,17 @@ out:
     return (eval);
 }
 
+static void * 
+c_thr_get(void *arg0, void *arg1)
+{
+ 
+    return (c_cache_get(arg0, arg1));
+}
+
+
 /******************************************************************************
  * Public Class-methods.
  ******************************************************************************/
-
-/*
- * Insert object.
- */
-void *
-c_cache_add(struct c_cache *ch, void *arg)
-{    
-    struct c_obj *co;
-    
-    if ((co = arg) == NULL)
-        return (NULL);
-
-    TAILQ_INSERT_TAIL(ch, co, co_next);    
-    
-    return (co);
-}
-
-/*
- * Find requested object.
- */
-void *     
-c_cache_get(struct c_cache *ch, void *arg)
-{    
-    struct c_obj *co, *co_tmp, *key;
-    
-    if ((key = arg) == NULL) 
-        return (NULL);
-    
-    TAILQ_FOREACH_SAFE(co, ch, co_next, co_tmp) {
-        if (co->co_id == key->co_id) 
-            break;
-    }
-    return (co);
-}
-
-/*
- * Fetch requested object.
- */
-void *     
-c_cache_del(struct c_cache *ch, void *arg)
-{    
-    struct c_obj *co;
-    
-    co = c_cache_get(ch, arg);
-
-    if (co)
-        TAILQ_REMOVE(ch, co, co_next);
-           
-    return (co);
-}
 
 void * 
 c_base_class_init(void)
@@ -562,14 +582,14 @@ c_base_class_fini(void)
  */
 
 static void *
-c_nop_init(void *arg)
+c_nop_init(void *arg __unused)
 {
 
     return (NULL);    
 }
 
 static int 
-c_nop_fini(void *arg)
+c_nop_fini(void *arg __unused)
 {
 
     return (-1);    
@@ -580,42 +600,42 @@ c_nop_fini(void *arg)
  */
 
 static void *
-c_nop_create(void *arg)
+c_nop_create(void *arg __unused)
 {
 
     return (NULL);
 }
 
 static void *     
-c_nop_start(void *arg)
+c_nop_start(void *arg __unused)
 {
 
     return (NULL);
 }
 
 static int     
-c_nop_lock(void *arg)
+c_nop_lock(void *arg __unused)
 {
 
     return (-1);
 }
 
 static int     
-c_nop_unlock(void *arg)
+c_nop_unlock(void *arg __unused)
 {
 
     return (-1);
 }
 
 static int     
-c_nop_sleep(struct c_methods *cm, void *arg)
+c_nop_sleep(void *cm0 __unused, void *arg __unused)
 {
 
     return (-1);
 }
 
 static int     
-c_nop_wakeup(struct c_methods *cm, void *arg)
+c_nop_wakeup(void *cm0 __unused, void *arg __unused)
 {
 
     return (-1);
@@ -623,24 +643,31 @@ c_nop_wakeup(struct c_methods *cm, void *arg)
 
 
 static int  
-c_nop_wait(struct c_methods *cm, u_int ts, void *arg)
+c_nop_wait(void *cm0 __unused, u_int ts __unused , void *arg __unused)
 {
 
     return (-1);
 }
 
 static int     
-c_nop_stop(void *arg)
+c_nop_stop(void *arg __unused)
 {
 
     return (-1);
 }
 
 static int     
-c_nop_destroy(void *arg0, void *arg1)
+c_nop_destroy(void *arg0 __unused, void *arg1 __unused)
 {
 
     return (-1);
+}
+
+static void * 
+c_nop_get(void *arg0 __unused, void *arg1 __unused)
+{
+ 
+    return (NULL);
 }
 
 
