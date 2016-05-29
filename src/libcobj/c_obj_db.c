@@ -76,6 +76,7 @@ static struct c_class c_obj_db_class = {
     .c_co = {
         .co_id         = C_OBJ_DB_CLASS,
         .co_len         = C_OBJ_DB_LEN,
+        .co_flags       = C_THR,
     },
     .c_public         = &c_obj_db_methods,
 };
@@ -96,7 +97,7 @@ c_obj_db_class_init(void)
 
     this = &c_obj_db_class;
 
-    if ((cm = c_base_class_init()) == NULL)
+    if ((cm = c_thr_class_init()) == NULL)
         return (NULL);
     
     if ((cm = (*cm->cm_init)(this)) == NULL)
@@ -144,10 +145,16 @@ c_obj_db_start(void *arg)
     if ((sc = arg) == NULL)
         goto out;
     
-    for (;;) {
-        if ((*cm->cm_sleep)(cm, sc))
-            (void)(*cm->cm_destroy)(this, sc);
-    }
+    sc->sc_db = dbopen(NULL, O_RDWR, 0, DB_HASH, NULL);
+/*
+ * On success, enter infinite loop and fell asleep.
+ */    
+    if (sc->sc_db) {   
+        for (;;) {
+            if ((*cm->cm_sleep)(cm, sc))
+                (void)(*cm->cm_destroy)(this, sc);
+        }
+    }    
 out:    
     return (NULL);
 }
@@ -190,7 +197,8 @@ c_obj_get(DB *db, DBT *key, void *arg __unused)
 }
 
 /*
- * Fetch requested object.
+ * Fetch requested object, but by this operation 
+ * bound ressources must be released by free(3).
  */
 static void *     
 c_obj_del(DB *db, DBT *key, void *arg __unused)
@@ -265,19 +273,11 @@ c_obj_db_create(void)
     this = &c_obj_db_class;
     cm = &this->c_base;
     
-    if ((sc = (*cm->cm_create)(this)) == NULL)
-        goto bad;
-    
-    sc->sc_db = dbopen(NULL, O_RDWR, 0, DB_HASH, NULL);
-        
-    if (sc->sc_db == NULL)
-        goto bad1;
-    
+    if ((sc = (*cm->cm_create)(this)) == NULL) {
+        (void)(*cm->cm_destroy)(this, sc);
+         return (NULL);
+    }
     return (&sc->sc_thr);
-bad1:    
-    (void)(*cm->cm_destroy)(this, sc);
-bad:
-    return (NULL);
 }
 
 /*

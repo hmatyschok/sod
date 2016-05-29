@@ -103,6 +103,7 @@ static struct c_class c_authenticator_class = {
     .c_co = {
         .co_id         = C_AUTHENTICATOR_CLASS,
         .co_len         = C_AUTHENTICATOR_LEN,
+        .co_flags       = C_THR,
     },
     .c_public         = &c_authenticator_methods,
 };
@@ -126,7 +127,7 @@ c_authenticator_class_init(void)
 
     this = &c_authenticator_class;
 
-    if ((cm = c_base_class_init()) == NULL)
+    if ((cm = c_thr_class_init()) == NULL)
         return (NULL);
     
     if ((cm = (*cm->cm_init)(this)) == NULL)

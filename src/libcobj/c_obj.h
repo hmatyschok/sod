@@ -82,7 +82,8 @@ struct c_obj {
     int         co_flags;
 #define C_INIT  0x00000001    
 #define C_LOCKED    0x00000002
-#define C_THREAD    0x00000004    
+#define C_BASE    0x00000010
+#define C_THR    0x00000020
     TAILQ_ENTRY(c_obj) co_next;
 };
 TAILQ_HEAD(c_cache, c_obj);
@@ -109,11 +110,11 @@ struct c_methods {
     c_wait_t        cm_wait;
     c_stop_t         cm_stop;
     c_destroy_t         cm_destroy;
-    
     c_obj_get_t    cm_get;
 };
 #define C_BASE_METHODS     1463676933
 #define C_NOP_METHODS     1463677298
+#define C_THR_METHODS     1464518536
 #define C_METHODS_LEN     (sizeof(struct c_methods))
 
 /*
@@ -136,7 +137,9 @@ struct c_class {
     void     *c_public;
 };
 #define C_BASE_CLASS     1463676824
+#define C_THR_CLASS     1464519469
 #define C_BASE_LEN     (sizeof(struct c_class))
+#define C_THR_LEN     (sizeof(struct c_class))
 
 /*
  * By pthread(3) covered instance.
@@ -180,6 +183,9 @@ void     c_msg_free(struct c_msg *);
 
 void *     c_base_class_init(void);
 int     c_base_class_fini(void);
+
+void *     c_thr_class_init(void);
+int     c_thr_class_fini(void);
 __END_DECLS
 
 #endif /* _C_OBJ_H_ */
