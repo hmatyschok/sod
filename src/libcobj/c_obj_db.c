@@ -31,7 +31,7 @@
 #include "c_obj.h"
 #include "c_obj_db.h"
 
-typedef void * 	(*c_obj_fn_t)(DB *, DBT *, void *);
+typedef void *     (*c_obj_fn_t)(DB *, DBT *, void *);
 
 /*
  * In-memory db(3) implements hash table holds non-threaded objects.
@@ -50,8 +50,8 @@ static void *     c_obj_db_start(void *);
 static int     c_obj_db_stop(void *);
 
 static void *   c_obj_add(DB *, DBT *, void *);
-static void * 	c_obj_get(DB *, DBT *, void *);
-static void * 	c_obj_del(DB *, DBT *, void *);
+static void *     c_obj_get(DB *, DBT *, void *);
+static void *     c_obj_del(DB *, DBT *, void *);
 static void *   c_obj_fn(c_obj_fn_t, DB *, void *);
 
 static void *     c_obj_db_create(void);
@@ -157,78 +157,78 @@ out:
  */
 static void *
 c_obj_add(DB *db, DBT *key, void *arg)
-{	
+{    
     struct c_obj *co;
     DBT data;
     
-	if ((co = arg) == NULL)
-	    return (NULL);
+    if ((co = arg) == NULL)
+        return (NULL);
 
-	data.data = co;
-	data.size = co->co_len;
-	
-	if ((*db->put)(db, key, &data, 0))
-		return (NULL);
-	
-	return (data.data);
+    data.data = co;
+    data.size = co->co_len;
+    
+    if ((*db->put)(db, key, &data, 0))
+        return (NULL);
+    
+    return (data.data);
 }
 
 /*
  * Find requested object.
  */
-static void * 	
+static void *     
 c_obj_get(DB *db, DBT *key, void *arg __unused)
-{	
-	DBT data;
+{    
+    DBT data;
 
     (void)memset(&data, 0, sizeof(data));
 
     if ((*db->get)(db, key, &data, 0))
         return (NULL);
-	
-	return (data.data);
+    
+    return (data.data);
 }
 
 /*
  * Fetch requested object.
  */
-static void * 	
+static void *     
 c_obj_del(DB *db, DBT *key, void *arg __unused)
 {
-	DBT data;
+    DBT data;
     void *rv;
-    	
-	(void)memset(&data, 0, sizeof(data));
-	
-	if ((*db->get)(db, key, &data, 0) == 0) {
-	   
-	    if ((rv = malloc(data.size)) != NULL) {
-	        (void)memmove(rv, data.data, data.size);
-	
-	        if ((*db->del)(db, key, 0)) {
-	            free(rv);
-		        rv = NULL;
-		    }
-        }	
+        
+    (void)memset(&data, 0, sizeof(data));
+    
+    if ((*db->get)(db, key, &data, 0) == 0) {
+       
+        if ((rv = malloc(data.size)) != NULL) {
+            (void)memmove(rv, data.data, data.size);
+    
+            if ((*db->del)(db, key, 0)) {
+                free(rv);
+                rv = NULL;
+            }
+        }    
     } else 
         rv = NULL;
     
-	return (rv);
+    return (rv);
 }
 
 static void *
 c_obj_fn(c_obj_fn_t fn, DB *db, void *arg)
 {
-	struct c_obj *co;	
-	DBT key;
+    struct c_obj *co;    
+    DBT key;
 
-	if ((co = arg) == NULL)
-	    return (NULL);
-	
-	key.data = &co->co_id;
-	key.size = sizeof(co->co_id);
-	
-	return ((*fn)(db, &key, arg));
+    if ((co = arg) == NULL)
+        return (NULL);
+    
+    key.data = &co->co_id;
+    key.size = sizeof(co->co_id);
+    
+    return ((*fn)(db, &key, arg));
 }
 
 /*
@@ -269,9 +269,9 @@ c_obj_db_create(void)
         goto bad;
     
     sc->sc_db = dbopen(NULL, O_RDWR, 0, DB_HASH, NULL);
-		
+        
     if (sc->sc_db == NULL)
-	    goto bad1;
+        goto bad1;
     
     return (&sc->sc_thr);
 bad1:    
