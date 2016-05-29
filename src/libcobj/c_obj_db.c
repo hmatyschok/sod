@@ -26,6 +26,7 @@
  */
 
 #include <string.h>
+#include <stdlib.h>
 
 #include "c_obj.h"
 #include "c_obj_db.h"
@@ -195,16 +196,24 @@ static void *
 c_obj_del(DB *db, DBT *key, void *arg __unused)
 {
 	DBT data;
+    void *rv;
     	
 	(void)memset(&data, 0, sizeof(data));
 	
-	if ((*db->get)(db, key, &data, 0))
-		return (NULL);
+	if ((*db->get)(db, key, &data, 0) == 0) {
+	   
+	    if ((rv = malloc(data.size)) != NULL) {
+	        (void)memmove(rv, data.data, data.size);
 	
-	if ((*db->del)(db, key, 0))
-		return (NULL);	
-
-	return (data.data);
+	        if ((*db->del)(db, key, 0)) {
+	            free(rv);
+		        rv = NULL;
+		    }
+        }	
+    } else 
+        rv = NULL;
+    
+	return (rv);
 }
 
 static void *
