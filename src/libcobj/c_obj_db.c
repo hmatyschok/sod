@@ -31,8 +31,6 @@
 #include "c_obj.h"
 #include "c_obj_db.h"
 
-typedef void *     (*c_obj_fn_t)(DB *, DBT *, void *);
-
 /*
  * In-memory db(3) implements hash table holds non-threaded objects.
  */
@@ -48,11 +46,6 @@ struct c_obj_db_softc {
 
 static void *     c_obj_db_start(void *); 
 static int     c_obj_db_stop(void *);
-
-static void *   c_obj_add(DB *, DBT *, void *);
-static void *     c_obj_get(DB *, DBT *, void *);
-static void *     c_obj_del(DB *, DBT *, void *);
-static void *   c_obj_fn(c_obj_fn_t, DB *, void *);
 
 static void *     c_obj_db_create(void);
 static void *     c_obj_db_add(void *, void *);
@@ -151,86 +144,6 @@ c_obj_db_start(void *arg)
     }    
 out:    
     return (NULL);
-}
-
-/*
- * Insert object.
- */
-static void *
-c_obj_add(DB *db, DBT *key, void *arg)
-{    
-    struct c_obj *co;
-    DBT data;
-    
-    if ((co = arg) == NULL)
-        return (NULL);
-
-    data.data = co;
-    data.size = co->co_len;
-    
-    if ((*db->put)(db, key, &data, 0))
-        return (NULL);
-    
-    return (data.data);
-}
-
-/*
- * Find requested object.
- */
-static void *     
-c_obj_get(DB *db, DBT *key, void *arg __unused)
-{    
-    DBT data;
-
-    (void)memset(&data, 0, sizeof(data));
-
-    if ((*db->get)(db, key, &data, 0))
-        return (NULL);
-    
-    return (data.data);
-}
-
-/*
- * Fetch requested object, but by this operation 
- * bound ressources must be released by free(3).
- */
-static void *     
-c_obj_del(DB *db, DBT *key, void *arg __unused)
-{
-    DBT data;
-    void *rv;
-        
-    (void)memset(&data, 0, sizeof(data));
-    
-    if ((*db->get)(db, key, &data, 0) == 0) {
-       
-        if ((rv = malloc(data.size)) != NULL) {
-            (void)memmove(rv, data.data, data.size);
-    
-            if ((*db->del)(db, key, 0)) {
-                free(rv);
-                rv = NULL;
-            }
-        }    
-    } else 
-        rv = NULL;
-    
-    return (rv);
-}
-
-static void *
-c_obj_fn(c_obj_fn_t fn, DB *db, void *arg)
-{
-    struct c_obj *co;    
-    DBT key;
-
-    if ((co = arg) == NULL)
-        return (NULL);
-    
-    key.data = &co->co_id;
-    key.size = sizeof(co->co_id);
-    
-    return ((*fn)(db, &key, arg));
 }
 
 /*

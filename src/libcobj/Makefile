@@ -33,7 +33,8 @@ LDADD=	-lpam -lpthread -lutil
 SHLIB_MAJOR=1
 SHLIB_MINOR=0
 
-SRCS=	c_obj.c \
+SRCS=	c_class.c \
+        c_obj.c \
 		c_obj_db.c \
 		c_msg.c \
 		c_authenticator.c \

@@ -37,6 +37,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 #ifdef C_OBJ_DEBUG
 #include <syslog.h>
@@ -48,6 +49,7 @@
 #define C_MSG_NAK     0x00000020
 #define C_MSG_REJ     0x00000030
 
+typedef void *  (*c_obj_fn_t)(DB *db, DBT *key, void *arg);
 typedef ssize_t     (*c_msg_fn_t)(int, struct msghdr *, int);
 
 typedef void *   (*c_obj_get_t)(void *, void *);
@@ -133,6 +135,21 @@ struct c_class {
 #define C_THR_LEN     (sizeof(struct c_class))
 
 /*
+ * Generic instance.
+ */
+struct c_base {
+    struct c_obj     ct_co;
+#define cb_id       cb_co.co_id
+#define cb_len      cb_co.co_len
+#define cb_flags    cb_co.co_flags
+
+/*
+ * Unnamed semaphore.
+ */    
+    sem_t       *cb_sem;
+};
+
+/*
  * By pthread(3) covered instance.
  */
 struct c_thr {
@@ -165,6 +182,12 @@ struct c_msg {
 #define C_MSG_QLEN     13
 
 __BEGIN_DECLS
+
+void *   c_obj_add(DB *, DBT *, void *);
+void *     c_obj_get(DB *, DBT *, void *);
+void *     c_obj_del(DB *, DBT *, void *);
+void *   c_obj_fn(c_obj_fn_t, DB *, void *);
+
 struct c_msg *     c_msg_alloc(void);
 void     c_msg_prepare(const char *, uint32_t, long, struct c_msg *);
 ssize_t     c_msg_send(int, struct msghdr *, int);
