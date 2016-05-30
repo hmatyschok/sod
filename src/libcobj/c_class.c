@@ -55,6 +55,10 @@ static void *   c_cache_del(struct c_cache *, void *);
 static int    c_class_init(void *, void *);
 static int     c_class_fini(void *, void *);
 
+static int  c_base_lock(void *);
+static int  c_base_unlock(void *);
+
+
 static void *     c_thr_create(void *);
 static int  c_thr_lock(void *);
 static int  c_thr_unlock(void *);
@@ -115,8 +119,8 @@ static struct c_methods c_base = {
     },
     .cm_create         = c_nop_create,
     .cm_start         = c_nop_start,
-    .cm_lock         = c_nop_lock,    
-    .cm_unlock         = c_nop_unlock,
+    .cm_lock         = c_base_lock,    
+    .cm_unlock         = c_base_unlock,
     .cm_wakeup       = c_nop_wakeup,
     .cm_sleep       = c_nop_sleep,
     .cm_wait        = c_nop_wait,
@@ -611,6 +615,47 @@ c_thr_get(void *arg0, void *arg1)
 }
 
 
+/*
+ * Lock instance.
+ */
+static int 
+c_base_lock(void *arg)
+{
+    struct c_base *base;
+    
+    if ((base = arg) == NULL) 
+        return (-1);
+    
+    if ((base->ct_flags & C_LOCKED) ^ C_LOCKED) {
+        if (sem_wait(base->cb_sem))
+            return (-1);    
+    
+        base->ct_flags |= C_LOCKED;
+    }
+    return (0);
+}
+
+/*
+ * Unlock instance.
+ */
+static int 
+c_base_unlock(void *arg)
+{
+    struct c_base *base;
+    
+    if ((base = arg) == NULL) 
+        return (-1);
+    
+    if (base->ct_flags & C_LOCKED) {
+        if (sem_post(base->cb_sem))
+            return (-1);    
+    
+        base->ct_flags &= ~C_LOCKED;
+    }
+    return (0);
+}
+
+
 /******************************************************************************
  * Public Class-methods.
  ******************************************************************************/
@@ -646,6 +691,12 @@ c_thr_class_fini(void *arg)
 
     return (c_class_fini(&c_thr_class, arg));    
 }
+
+
+
+
+
+
 
 
 /*

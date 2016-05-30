@@ -32,6 +32,7 @@
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <unistd.h>
 
 #include <db.h>
 #include <fcntl.h>
@@ -147,6 +148,7 @@ struct c_base {
  * Unnamed semaphore.
  */    
     sem_t       *cb_sem;
+    pid_t       *cb_pid;
 };
 
 /*
