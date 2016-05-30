@@ -84,14 +84,18 @@ static struct c_class c_signal_class = {
 struct c_signal * 
 c_signal_class_init(void)
 {
+   struct c_class *this;
+   
    if (c_thr_class_init(NULL))
         return (NULL);
    
-   if (c_thr_class_init(&c_signal_class))
+   this = &c_signal_class;
+   
+   if (c_thr_class_init(this))
         return (NULL);
 
-    c_signal_class.c_base.cm_start = c_signal_start;
-    c_signal_class.c_base.cm_stop = c_signal_stop;
+    this->c_base.cm_start = c_signal_start;
+    this->c_base.cm_stop = c_signal_stop;
     
     return (&c_signal_methods);    
 }
@@ -103,8 +107,11 @@ c_signal_class_init(void)
 int  
 c_signal_class_fini(void)
 {
+    struct c_class *this;
 
-    return (c_thr_class_fini(&c_signal_class)); 
+    this = &c_signal_class;
+
+    return (c_thr_class_fini(this)); 
 }
 
 /******************************************************************************
@@ -164,9 +171,11 @@ c_signal_stop(void *arg)
 static void *
 c_signal_create(void) 
 {
+    struct c_class *this;
     struct c_signal_softc *sc;
     
-    sc = (*c_signal_class.c_base.cm_create)(&c_signal_class);
+    this = &c_signal_class;
+    sc = (*this->c_base.cm_create)(this);
     
     if (sc == NULL)
         goto bad;
@@ -179,7 +188,7 @@ c_signal_create(void)
     
     return (&sc->sc_thr);
 bad1:    
-    (void)(*c_signal_class.c_base.cm_destroy)(&c_signal_class, sc);
+    (void)(*this->c_base.cm_destroy)(this, sc);
 bad:
     return (NULL);
 }
@@ -190,10 +199,11 @@ bad:
 static int 
 c_signal_sigmask(int how, void *arg) 
 { 
+    struct c_class *this; 
     struct c_signal_softc *sc;
    
-    sc = (*c_signal_class.c_base.cm_get)
-        (&c_signal_class.c_instances, arg);
+    this = &c_signal_class;
+    sc = (*this->c_base.cm_get)(&this->c_instances, arg);
     
     if (sc == NULL)
         return (-1);
@@ -216,11 +226,14 @@ static int
 c_signal_destroy(void *arg) 
 {
     struct c_thr *thr;
+    struct c_class *this;
 
     if ((thr = arg) == NULL)
         return (-1);
 
-    return ((*c_signal_class.c_base.cm_destroy)(&c_signal_class, thr));
+    this = &c_signal_class;
+
+    return ((*this->c_base.cm_destroy)(this, thr));
 }
 
 

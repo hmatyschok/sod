@@ -120,14 +120,18 @@ static const char     *ca_pw_prompt_default = C_AUTHENTICATOR_PW_PROMPT_DFLT;
 struct c_authenticator * 
 c_authenticator_class_init(void)
 {
+    struct c_class *this;
+    
     if (c_thr_class_init(NULL))
         return (NULL);
     
-    if (c_thr_class_init(&c_authenticator_class))
+    this = &c_authenticator_class;
+    
+    if (c_thr_class_init(this))
         return (NULL);
 
-    c_authenticator_class.c_base.cm_start = c_authenticator_start;
-    c_authenticator_class.c_base.cm_stop = c_authenticator_stop;
+    this->c_base.cm_start = c_authenticator_start;
+    this->c_base.cm_stop = c_authenticator_stop;
 
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
@@ -143,12 +147,15 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 int  
 c_authenticator_class_fini(void)
 {
+    struct c_class *this;
+
+    this = &c_authenticator_class;
 
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */    
     
-    return (c_thr_class_fini(&c_authenticator_class));    
+    return (c_thr_class_fini(this));    
 }
 
 /******************************************************************************
@@ -256,14 +263,17 @@ c_authenticator_start(void *arg)
 {
     ca_state_t fn;
     struct ca_softc *sc;
+    struct c_class *this;
     
     fn = NULL;
     
     if ((sc = arg) == NULL)
         goto out;
     
-    if ((*c_authenticator_class.c_base.cm_sleep)
-        (&c_authenticator_class.c_base, sc) == 0)
+    this = &c_authenticator_class;
+    
+    if ((*this->c_base.cm_sleep)
+        (&this->c_base, sc) == 0)
         fn = (ca_state_t)c_authenticator_establish;    
 
 #ifdef C_OBJ_DEBUG        
@@ -322,6 +332,7 @@ out:
 static ca_state_fn_t  
 c_authenticator_authenticate(void *arg)
 {    
+    struct c_class *this;
     ca_state_fn_t state;
     login_cap_t *lc;
     struct ca_softc *sc;
@@ -329,6 +340,7 @@ c_authenticator_authenticate(void *arg)
     int ask = 0, cnt = 0;
     uint32_t resp;
 
+    this = &c_authenticator_class;
     state = NULL;
     lc = NULL;
     
@@ -402,8 +414,8 @@ syslog(LOG_DEBUG, "%s\n", __func__);
                 cnt += 1;    
         
                 if (cnt > backoff) 
-                    (*c_authenticator_class.c_base.cm_wait)
-                        (&c_authenticator_class.c_base, 
+                    (*this->c_base.cm_wait)
+                        (&this->c_base, 
                             (u_int)((cnt - backoff) * 5), sc);
         
                 if (cnt >= retries)
@@ -485,9 +497,11 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 static void *
 c_authenticator_create(int sock_srv, int sock_rmt) 
 {
+    struct c_class *this;
     struct ca_softc *sc;
     
-    sc = (*c_authenticator_class.c_base.cm_create)(&c_authenticator_class);
+    this = &c_authenticator_class;
+    sc = (*this->c_base.cm_create)(this);
     
     if (sc == NULL) 
         return (NULL);
@@ -499,8 +513,8 @@ c_authenticator_create(int sock_srv, int sock_rmt)
 /*
  * Release stalled execution.
  */        
-    (void)(*c_authenticator_class.c_base.cm_wakeup)
-        (&c_authenticator_class.c_base, sc);
+    (void)(*this->c_base.cm_wakeup)
+        (&this->c_base, sc);
 
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
@@ -533,14 +547,16 @@ static int
 c_authenticator_destroy(void *arg) 
 {
     struct c_thr *thr;
+    struct c_class *this;
 
     if ((thr = arg) == NULL)
         return (-1);
+    
+    this = &c_authenticator_class;
     
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */    
 
-    return ((*c_authenticator_class.c_base.cm_destroy)
-        (&c_authenticator_class, thr));
+    return ((*this->c_base.cm_destroy)(this, thr));
 }
