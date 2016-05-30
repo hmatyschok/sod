@@ -90,12 +90,10 @@ c_signal_class_init(void)
 
     this = &c_signal_class;
 
-    if ((cm = c_base_class_init()) == NULL)
-        return (NULL);
-    
-    if ((cm = (*cm->cm_init)(this)) == NULL)
+   if (c_thr_class_init(this))
         return (NULL);
 
+    cm = &this->c_base;
     cm->cm_start = c_signal_start;
     cm->cm_stop = c_signal_stop;
     
@@ -110,12 +108,10 @@ int
 c_signal_class_fini(void)
 {
     struct c_class *this;
-    struct c_methods *cm;
 
     this = &c_signal_class;
-    cm = &this->c_base;
     
-    return ((*cm->cm_fini)(this));    
+    return (c_thr_class_fini(this)); 
 }
 
 /******************************************************************************

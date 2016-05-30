@@ -76,7 +76,6 @@ static struct c_class c_obj_db_class = {
     .c_co = {
         .co_id         = C_OBJ_DB_CLASS,
         .co_len         = C_OBJ_DB_LEN,
-        .co_flags       = C_THR,
     },
     .c_public         = &c_obj_db_methods,
 };
@@ -97,12 +96,10 @@ c_obj_db_class_init(void)
 
     this = &c_obj_db_class;
 
-    if ((cm = c_thr_class_init()) == NULL)
-        return (NULL);
-    
-    if ((cm = (*cm->cm_init)(this)) == NULL)
+    if (c_thr_class_init(this))
         return (NULL);
 
+    cm = &this->c_base;
     cm->cm_start = c_obj_db_start;
     cm->cm_stop = c_obj_db_stop;
     
@@ -117,12 +114,10 @@ int
 c_obj_db_class_fini(void)
 {
     struct c_class *this;
-    struct c_methods *cm;
 
     this = &c_obj_db_class;
-    cm = &this->c_base;
     
-    return ((*cm->cm_fini)(this));    
+    return (c_thr_class_fini(this));     
 }
 
 /******************************************************************************

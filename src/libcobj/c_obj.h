@@ -52,9 +52,6 @@ typedef ssize_t     (*c_msg_fn_t)(int, struct msghdr *, int);
 
 typedef void *   (*c_obj_get_t)(void *, void *);
 
-typedef void *     (*c_init_t)(void *);
-typedef int     (*c_fini_t)(void *);
-
 typedef void *    (*c_create_t)(void *);
 typedef void *    (*c_start_t)(void *);
 
@@ -96,8 +93,6 @@ struct c_methods {
 #define cm_id       cm_co.co_id
 #define cm_len      cm_co.co_len
 #define cm_flags    cm_co.co_flags
-    c_init_t         cm_init;
-    c_fini_t         cm_fini;
 /*
  * Methods implemets life-cycle of an instance.  
  */    
@@ -181,11 +176,11 @@ ssize_t     c_msg_recv(int, struct msghdr *, int);
 int     c_msg_fn(c_msg_fn_t, int, struct c_msg *);
 void     c_msg_free(struct c_msg *);
 
-void *     c_base_class_init(void);
-int     c_base_class_fini(void);
+int     c_base_class_init(void *);
+int     c_base_class_fini(void *);
 
-void *     c_thr_class_init(void);
-int     c_thr_class_fini(void);
+int     c_thr_class_init(void *);
+int     c_thr_class_fini(void *);
 __END_DECLS
 
 #endif /* _C_OBJ_H_ */

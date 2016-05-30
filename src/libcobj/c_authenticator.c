@@ -127,12 +127,10 @@ c_authenticator_class_init(void)
 
     this = &c_authenticator_class;
 
-    if ((cm = c_thr_class_init()) == NULL)
-        return (NULL);
-    
-    if ((cm = (*cm->cm_init)(this)) == NULL)
+    if (c_thr_class_init(this))
         return (NULL);
 
+    cm = &this->c_base;
     cm->cm_start = c_authenticator_start;
     cm->cm_stop = c_authenticator_stop;
 
@@ -151,16 +149,14 @@ int
 c_authenticator_class_fini(void)
 {
     struct c_class *this;
-    struct c_methods *cm;
 
     this = &c_authenticator_class;
-    cm = &this->c_base;
     
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */    
     
-    return ((*cm->cm_fini)(this));    
+    return (c_thr_class_fini(this));    
 }
 
 /******************************************************************************

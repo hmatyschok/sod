@@ -52,8 +52,8 @@ static void *   c_cache_add(struct c_cache *, void *);
 static void *   c_cache_get(struct c_cache *, void *);
 static void *   c_cache_del(struct c_cache *, void *);
 
-static void *    c_class_init(void *);
-static int     c_class_fini(void *);
+static int    c_class_init(void *, void *);
+static int     c_class_fini(void *, void *);
 
 static void *     c_thr_create(void *);
 static int  c_thr_lock(void *);
@@ -65,8 +65,6 @@ static int     c_thr_destroy(void *, void *);
 
 static void *   c_thr_get(void *, void *);
 
-static void *     c_nop_init(void *);
-static int     c_nop_fini(void *);
 static void *     c_nop_create(void *);
 static void *     c_nop_start(void *);
 
@@ -94,8 +92,6 @@ static struct c_methods c_nop = {
         .co_id         = C_NOP_METHODS,
         .co_len         = C_METHODS_LEN,
     },
-    .cm_init         = c_nop_init,
-    .cm_fini         = c_nop_fini,
     .cm_create         = c_nop_create,
     .cm_start         = c_nop_start,
     .cm_lock         = c_nop_lock,    
@@ -117,8 +113,6 @@ static struct c_methods c_base = {
         .co_id         = C_BASE_METHODS,
         .co_len         = C_METHODS_LEN,
     },
-    .cm_init         = c_nop_init,
-    .cm_fini         = c_nop_fini,
     .cm_create         = c_nop_create,
     .cm_start         = c_nop_start,
     .cm_lock         = c_nop_lock,    
@@ -141,8 +135,6 @@ static struct c_methods c_thr = {
         .co_id         = C_THR_METHODS,
         .co_len         = C_THR_LEN,
     },
-    .cm_init         = c_class_init,
-    .cm_fini         = c_class_fini,
     .cm_create         = c_thr_create,
     .cm_start         = c_nop_start,
     .cm_lock       = c_thr_lock,
@@ -169,7 +161,6 @@ static struct c_class c_base_class = {
     .c_co = {
         .co_id         = C_BASE_CLASS,
         .co_len         = C_BASE_LEN,
-        .co_flags       = C_BASE,
     },
     .c_public         = &c_nop,
 };
@@ -178,7 +169,6 @@ static struct c_class c_thr_class = {
     .c_co = {
         .co_id         = C_THR_CLASS,
         .co_len         = C_THR_LEN,
-        .co_flags       = C_THR,
     },
     .c_public         = &c_nop,
 };
@@ -239,22 +229,20 @@ c_cache_del(struct c_cache *ch, void *arg)
 }
 
 static int 
-c_children_free(struct c_class *cls)
+c_children_free(struct c_class *cls0)
 {
-    struct c_methods *cm;
     struct c_cache *ch;
-    struct c_obj *co;
+    struct c_obj *cls;
 
-    if (cls == NULL)
+    if (cls0 == NULL)
         return (-1);
     
-    cm = &cls->c_base;
-    ch = &cls->c_children;
+    ch = &cls0->c_children;
 
     while (!TAILQ_EMPTY(ch)) {
-        co = TAILQ_FIRST(ch);
+        cls = TAILQ_FIRST(ch);
         
-        if ((*cm->cm_fini)(co))
+        if (c_class_fini(cls0, cls))
             return (-1);
     }
     return (0);
@@ -282,23 +270,25 @@ c_instances_free(struct c_class *cls)
     return (0);
 }
 
-/******************************************************************************
- * Protected class-methods.
- ******************************************************************************/
-
 /*
  * Generic class-methods.
  */
 
-static void *
-c_class_init(void *arg)
+static int
+c_class_init(void *arg0, void *arg1)
 {
+    struct c_class *cls0;
     struct c_class *cls;
-    struct c_cache *ch;
     
-    if ((cls = arg) == NULL) 
-        return (NULL);
-
+    if ((cls = arg1) == NULL) 
+        cls = arg0;
+     
+    if (cls == NULL)
+        return (-1);
+    
+    if ((cls0 = arg0) == NULL)
+        return (-1);
+    
     if ((cls->c_flags & C_INIT) ^ C_INIT) {
 /*
  * XXX: This might be refactored as generic implementation.
@@ -306,30 +296,12 @@ c_class_init(void *arg)
         TAILQ_INIT(&cls->c_children);
         TAILQ_INIT(&cls->c_instances);
        
-        if (cls == &c_base_class) 
-            ;
-        else if (cls == &c_thr_class)
-            ;
-        else { 
-         
-            if (cls->c_flags & C_BASE)
-                ch = &c_base_class.c_children;
-            else if (cls->c_flags & C_THR)
-                ch = &c_thr_class.c_children;
-            else
-                ;
-
-            if (c_cache_add(ch, cls) == NULL) 
-                return (NULL);
+        if (cls != cls0) { 
+            if (c_cache_add(&cls0->c_children, cls) == NULL) 
+                return (-1);
+            
+            cls->c_base = cls0->c_base;
         }
-        
-        if (cls->c_flags & C_BASE)
-            cls->c_base = c_base;
-        else if (cls->c_flags & C_THR)
-            cls->c_base = c_thr;
-        else
-            cls->c_base = c_nop;
-        
         cls->c_flags |= C_INIT;
     }
     
@@ -337,16 +309,22 @@ c_class_init(void *arg)
 syslog(LOG_DEBUG, "%s: %ld\n", __func__, cls->c_id);
 #endif /* C_OBJ_DEBUG */
 
-    return (&cls->c_base);
+    return (0);
 }
 
 static int 
-c_class_fini(void *arg)
+c_class_fini(void *arg0, void *arg1)
 {
+    struct c_class *cls0;
     struct c_class *cls;
-    struct c_cache *ch;
-
-    if ((cls = arg) == NULL) 
+    
+    if ((cls = arg1) == NULL) 
+        cls = arg0;
+     
+    if (cls == NULL)
+        return (-1);
+    
+    if ((cls0 = arg0) == NULL)
         return (-1);
     
     if (cls->c_flags & C_INIT) {
@@ -359,13 +337,12 @@ c_class_fini(void *arg)
         if (c_instances_free(cls)) 
             return (-1);
 
-        if (cls != &c_base_class) {
-            ch = &c_base_class.c_children;
-
-            if (c_cache_del(ch, cls) == NULL) 
+        if (cls != cls0) { 
+            if (c_cache_del(&cls0->c_children, cls) == NULL) 
                 return (-1);
+            
+            cls->c_base = c_nop;
         }
-        cls->c_base = c_nop;
         cls->c_flags &= ~C_INIT;    
     }
         
@@ -375,6 +352,11 @@ syslog(LOG_DEBUG, "%s: %ld\n", __func__, cls->c_id);
 
     return (0);    
 }
+
+
+/******************************************************************************
+ * Protected class-methods.
+ ******************************************************************************/
 
 /*
  * An abstract component acts as factory for generating a component
@@ -635,50 +617,38 @@ c_thr_get(void *arg0, void *arg1)
  * Public Class-methods.
  ******************************************************************************/
 
-void * 
-c_base_class_init(void)
+int 
+c_base_class_init(void *arg)
 {
-    return (c_class_init(&c_base_class));    
+    if ((c_base_class.c_flags & C_INIT) ^ C_INIT) 
+        c_base_class.c_base = c_base;
+    
+    return (c_class_init(&c_base_class, arg));    
 }
 
 int 
-c_base_class_fini(void)
+c_base_class_fini(void *arg)
 {
 
-    return (c_class_fini(&c_base_class));    
-}
-
-void * 
-c_thr_class_init(void)
-{
-    return (c_class_init(&c_thr_class));    
+    return (c_class_fini(&c_base_class, arg));    
 }
 
 int 
-c_thr_class_fini(void)
+c_thr_class_init(void *arg)
 {
-
-    return (c_class_fini(&c_thr_class));    
+    if ((c_thr_class.c_flags & C_INIT) ^ C_INIT) 
+        c_thr_class.c_base = c_thr;
+    
+    return (c_class_init(&c_thr_class, arg));    
 }
 
-
-/*
- * Non-operations, class scope.
- */
-
-static void *
-c_nop_init(void *arg __unused)
+int 
+c_thr_class_fini(void *arg)
 {
 
-    return (NULL);    
+    return (c_class_fini(&c_thr_class, arg));    
 }
 
-static int 
-c_nop_fini(void *arg __unused)
-{
-
-    return (-1);    
-}
 
 /*
  * Null-operations, object scope.
