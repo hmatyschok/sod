@@ -246,7 +246,7 @@ sod_atexit(void)
 {
     if (ca != NULL) 
         (void)c_authenticator_class_fini(); {
-        (void)c_thr_class_fini();
+        (void)c_thr_class_fini(NULL);
     }
     (void)unlink(sock_file);
     (void)unlink(pid_file);

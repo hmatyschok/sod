@@ -162,7 +162,6 @@ static struct c_class c_base_class = {
         .co_id         = C_BASE_CLASS,
         .co_len         = C_BASE_LEN,
     },
-    .c_public         = &c_nop,
 };
 
 static struct c_class c_thr_class = {
@@ -170,7 +169,6 @@ static struct c_class c_thr_class = {
         .co_id         = C_THR_CLASS,
         .co_len         = C_THR_LEN,
     },
-    .c_public         = &c_nop,
 };
 
 

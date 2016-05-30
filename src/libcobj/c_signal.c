@@ -71,7 +71,6 @@ static struct c_class c_signal_class = {
         .co_id         = C_SIGNAL_CLASS,
         .co_len         = C_SIGNAL_LEN,
     },
-    .c_public         = &c_signal_methods,
 };
 
 /******************************************************************************
@@ -85,19 +84,16 @@ static struct c_class c_signal_class = {
 struct c_signal * 
 c_signal_class_init(void)
 {
-    struct c_class *this;
-    struct c_methods *cm;
-
-    this = &c_signal_class;
-
-   if (c_thr_class_init(this))
+   if (c_thr_class_init(NULL))
+        return (NULL);
+   
+   if (c_thr_class_init(&c_signal_class))
         return (NULL);
 
-    cm = &this->c_base;
-    cm->cm_start = c_signal_start;
-    cm->cm_stop = c_signal_stop;
+    c_signal_class.c_base.cm_start = c_signal_start;
+    c_signal_class.c_base.cm_stop = c_signal_stop;
     
-    return (this->c_public);    
+    return (&c_signal_methods);    
 }
 
 /*
@@ -107,11 +103,8 @@ c_signal_class_init(void)
 int  
 c_signal_class_fini(void)
 {
-    struct c_class *this;
 
-    this = &c_signal_class;
-    
-    return (c_thr_class_fini(this)); 
+    return (c_thr_class_fini(&c_signal_class)); 
 }
 
 /******************************************************************************
@@ -134,7 +127,7 @@ c_signal_start(void *arg)
         if (sigwait(&sc->sc_sigset, &sig) != 0)
             errx(EX_OSERR, "Can't select signal set");
 /*
- * XXX: this will be replaced by callback...
+ * XXX: &c_signal_class will be replaced by callback...
  */
         switch (sig) {
         case SIGHUP:
@@ -171,14 +164,11 @@ c_signal_stop(void *arg)
 static void *
 c_signal_create(void) 
 {
-    struct c_class *this;
-    struct c_methods *cm;
     struct c_signal_softc *sc;
-
-    this = &c_signal_class;
-    cm = &this->c_base;
     
-    if ((sc = (*cm->cm_create)(this)) == NULL)
+    sc = (*c_signal_class.c_base.cm_create)(&c_signal_class);
+    
+    if (sc == NULL)
         goto bad;
     
     if (sigemptyset(&sc->sc_sigaction.sa_mask) < 0)
@@ -189,7 +179,7 @@ c_signal_create(void)
     
     return (&sc->sc_thr);
 bad1:    
-    (void)(*cm->cm_destroy)(this, sc);
+    (void)(*c_signal_class.c_base.cm_destroy)(&c_signal_class, sc);
 bad:
     return (NULL);
 }
@@ -200,14 +190,10 @@ bad:
 static int 
 c_signal_sigmask(int how, void *arg) 
 { 
-    struct c_class *this;
-    struct c_methods *cm;
     struct c_signal_softc *sc;
    
-    this = &c_signal_class;
-    cm = &this->c_base;
-  
-    sc = (*cm->cm_get)(&this->c_instances, arg);
+    sc = (*c_signal_class.c_base.cm_get)
+        (&c_signal_class.c_instances, arg);
     
     if (sc == NULL)
         return (-1);
@@ -230,16 +216,11 @@ static int
 c_signal_destroy(void *arg) 
 {
     struct c_thr *thr;
-    struct c_class *this;
-    struct c_methods *cm;
-    
+
     if ((thr = arg) == NULL)
         return (-1);
-    
-    this = &c_signal_class;
-    cm = &this->c_base;
-    
-    return ((*cm->cm_destroy)(this, thr));
+
+    return ((*c_signal_class.c_base.cm_destroy)(&c_signal_class, thr));
 }
 
 

@@ -77,7 +77,6 @@ static struct c_class c_obj_db_class = {
         .co_id         = C_OBJ_DB_CLASS,
         .co_len         = C_OBJ_DB_LEN,
     },
-    .c_public         = &c_obj_db_methods,
 };
 
 /******************************************************************************
@@ -91,19 +90,16 @@ static struct c_class c_obj_db_class = {
 struct c_obj_db * 
 c_obj_db_class_init(void)
 {
-    struct c_class *this;
-    struct c_methods *cm;
-
-    this = &c_obj_db_class;
-
-    if (c_thr_class_init(this))
+    if (c_thr_class_init(NULL))
+        return (NULL);
+    
+    if (c_thr_class_init(&c_obj_db_class))
         return (NULL);
 
-    cm = &this->c_base;
-    cm->cm_start = c_obj_db_start;
-    cm->cm_stop = c_obj_db_stop;
+    c_obj_db_class.c_base.cm_start = c_obj_db_start;
+    c_obj_db_class.c_base.cm_stop = c_obj_db_stop;
     
-    return (this->c_public);    
+    return (&c_obj_db_methods);    
 }
 
 /*
@@ -113,11 +109,8 @@ c_obj_db_class_init(void)
 int  
 c_obj_db_class_fini(void)
 {
-    struct c_class *this;
 
-    this = &c_obj_db_class;
-    
-    return (c_thr_class_fini(this));     
+    return (c_thr_class_fini(&c_obj_db_class));     
 }
 
 /******************************************************************************
@@ -130,12 +123,7 @@ c_obj_db_class_fini(void)
 static void *
 c_obj_db_start(void *arg)
 {
-    struct c_class *this;
-    struct c_methods *cm;
     struct c_obj_db_softc *sc;
-    
-    this = &c_obj_db_class;
-    cm = &this->c_base;
     
     if ((sc = arg) == NULL)
         goto out;
@@ -146,8 +134,8 @@ c_obj_db_start(void *arg)
  */    
     if (sc->sc_db) {   
         for (;;) {
-            if ((*cm->cm_sleep)(cm, sc))
-                (void)(*cm->cm_destroy)(this, sc);
+            if ((*c_obj_db_class.c_base.cm_sleep)(&c_obj_db_class.c_base, sc))
+                (void)(*c_obj_db_class.c_base.cm_destroy)(&c_obj_db_class, sc);
         }
     }    
 out:    
@@ -261,15 +249,12 @@ c_obj_db_stop(void *arg)
 static void *
 c_obj_db_create(void) 
 {
-    struct c_class *this;
-    struct c_methods *cm;
     struct c_obj_db_softc *sc;
 
-    this = &c_obj_db_class;
-    cm = &this->c_base;
+    sc = (*c_obj_db_class.c_base.cm_create)(&c_obj_db_class);
     
-    if ((sc = (*cm->cm_create)(this)) == NULL) {
-        (void)(*cm->cm_destroy)(this, sc);
+    if (sc == NULL) {
+        (void)(*c_obj_db_class.c_base.cm_destroy)(&c_obj_db_class, sc);
          return (NULL);
     }
     return (&sc->sc_thr);
@@ -281,21 +266,16 @@ c_obj_db_create(void)
 static void *
 c_obj_db_add(void *arg0, void *arg1) 
 { 
-    struct c_class *this;
-    struct c_methods *cm;
     struct c_obj_db_softc *sc;
- 
-    this = &c_obj_db_class;
-    cm = &this->c_base;
-    
-    sc = (*cm->cm_get)(&this->c_instances, arg1);
+
+    sc = (*c_obj_db_class.c_base.cm_get)(&c_obj_db_class.c_instances, arg1);
     
     if (sc == NULL)
         return (NULL);
 /*
  * Release stalled execution.
  */ 
-    (void)(*cm->cm_wakeup)(cm, sc);
+    (void)(*c_obj_db_class.c_base.cm_wakeup)(&c_obj_db_class.c_base, sc);
  
     return (c_obj_fn(c_obj_add, sc->sc_db, arg0));
 }
@@ -306,21 +286,16 @@ c_obj_db_add(void *arg0, void *arg1)
 static void *
 c_obj_db_get(void *arg0, void *arg1) 
 { 
-    struct c_class *this;
-    struct c_methods *cm;
     struct c_obj_db_softc *sc;
  
-    this = &c_obj_db_class;
-    cm = &this->c_base;
-    
-    sc = (*cm->cm_get)(&this->c_instances, arg1);
+    sc = (*c_obj_db_class.c_base.cm_get)(&c_obj_db_class.c_instances, arg1);
     
     if (sc == NULL)
         return (NULL);
 /*
  * Release stalled execution.
  */ 
-    (void)(*cm->cm_wakeup)(cm, sc);
+    (void)(*c_obj_db_class.c_base.cm_wakeup)(&c_obj_db_class.c_base, sc);
  
     return (c_obj_fn(c_obj_get, sc->sc_db, arg0));
 }
@@ -330,22 +305,17 @@ c_obj_db_get(void *arg0, void *arg1)
  */
 static void *
 c_obj_db_del(void *arg0, void *arg1) 
-{ 
-    struct c_class *this;
-    struct c_methods *cm;
+{
     struct c_obj_db_softc *sc;
- 
-    this = &c_obj_db_class;
-    cm = &this->c_base;
-    
-    sc = (*cm->cm_get)(&this->c_instances, arg1);
+
+    sc = (*c_obj_db_class.c_base.cm_get)(&c_obj_db_class.c_instances, arg1);
     
     if (sc == NULL)
         return (NULL);
 /*
  * Release stalled execution.
  */ 
-    (void)(*cm->cm_wakeup)(cm, sc);
+    (void)(*c_obj_db_class.c_base.cm_wakeup)(&c_obj_db_class.c_base, sc);
  
     return (c_obj_fn(c_obj_del, sc->sc_db, arg0));
 }
@@ -357,15 +327,11 @@ static int
 c_obj_db_destroy(void *arg) 
 {
     struct c_thr *thr;
-    struct c_class *this;
-    struct c_methods *cm;
-    
+
     if ((thr = arg) == NULL)
         return (-1);
     
-    this = &c_obj_db_class;
-    cm = &this->c_base;
     
-    return ((*cm->cm_destroy)(this, thr));
+    return ((*c_obj_db_class.c_base.cm_destroy)(&c_obj_db_class, thr));
 }
 

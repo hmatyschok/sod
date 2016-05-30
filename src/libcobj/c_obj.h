@@ -126,10 +126,6 @@ struct c_class {
  * From parent inherited interface.
  */
     struct c_methods         c_base;
-/*
- * Public interface.
- */
-    void     *c_public;
 };
 #define C_BASE_CLASS     1463676824
 #define C_THR_CLASS     1464519469

@@ -103,9 +103,7 @@ static struct c_class c_authenticator_class = {
     .c_co = {
         .co_id         = C_AUTHENTICATOR_CLASS,
         .co_len         = C_AUTHENTICATOR_LEN,
-        .co_flags       = C_THR,
     },
-    .c_public         = &c_authenticator_methods,
 };
 
 static const char     *ca_prompt_default = C_AUTHENTICATOR_PROMPT_DFLT;
@@ -122,23 +120,20 @@ static const char     *ca_pw_prompt_default = C_AUTHENTICATOR_PW_PROMPT_DFLT;
 struct c_authenticator * 
 c_authenticator_class_init(void)
 {
-    struct c_class *this;
-    struct c_methods *cm;
-
-    this = &c_authenticator_class;
-
-    if (c_thr_class_init(this))
+    if (c_thr_class_init(NULL))
+        return (NULL);
+    
+    if (c_thr_class_init(&c_authenticator_class))
         return (NULL);
 
-    cm = &this->c_base;
-    cm->cm_start = c_authenticator_start;
-    cm->cm_stop = c_authenticator_stop;
+    c_authenticator_class.c_base.cm_start = c_authenticator_start;
+    c_authenticator_class.c_base.cm_stop = c_authenticator_stop;
 
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */
     
-    return (this->c_public);    
+    return (&c_authenticator_methods);    
 }
 
 /*
@@ -148,15 +143,12 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 int  
 c_authenticator_class_fini(void)
 {
-    struct c_class *this;
 
-    this = &c_authenticator_class;
-    
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */    
     
-    return (c_thr_class_fini(this));    
+    return (c_thr_class_fini(&c_authenticator_class));    
 }
 
 /******************************************************************************
@@ -262,19 +254,16 @@ syslog(LOG_DEBUG, "%s: rx: %s\n", __func__, sc->sc_buf.msg_tok);
 static void *
 c_authenticator_start(void *arg)
 {
-    struct c_class *this;
-    struct c_methods *cm;
     ca_state_t fn;
     struct ca_softc *sc;
     
-    this = &c_authenticator_class;
-    cm = &this->c_base;
     fn = NULL;
     
     if ((sc = arg) == NULL)
         goto out;
     
-    if ((*cm->cm_sleep)(cm, sc) == 0)
+    if ((*c_authenticator_class.c_base.cm_sleep)
+        (&c_authenticator_class.c_base, sc) == 0)
         fn = (ca_state_t)c_authenticator_establish;    
 
 #ifdef C_OBJ_DEBUG        
@@ -333,8 +322,6 @@ out:
 static ca_state_fn_t  
 c_authenticator_authenticate(void *arg)
 {    
-    struct c_class *this;
-    struct c_methods *cm;
     ca_state_fn_t state;
     login_cap_t *lc;
     struct ca_softc *sc;
@@ -342,8 +329,6 @@ c_authenticator_authenticate(void *arg)
     int ask = 0, cnt = 0;
     uint32_t resp;
 
-    this = &c_authenticator_class;
-    cm = &this->c_base;
     state = NULL;
     lc = NULL;
     
@@ -417,8 +402,9 @@ syslog(LOG_DEBUG, "%s\n", __func__);
                 cnt += 1;    
         
                 if (cnt > backoff) 
-                    (*cm->cm_wait)
-                        (cm, (u_int)((cnt - backoff) * 5), sc);
+                    (*c_authenticator_class.c_base.cm_wait)
+                        (&c_authenticator_class.c_base, 
+                            (u_int)((cnt - backoff) * 5), sc);
         
                 if (cnt >= retries)
                     ask = 0;        
@@ -499,14 +485,11 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 static void *
 c_authenticator_create(int sock_srv, int sock_rmt) 
 {
-    struct c_class *this;
-    struct c_methods *cm;
     struct ca_softc *sc;
     
-    this = &c_authenticator_class;
-    cm = &this->c_base;
+    sc = (*c_authenticator_class.c_base.cm_create)(&c_authenticator_class);
     
-    if ((sc = (*cm->cm_create)(this)) == NULL) 
+    if (sc == NULL) 
         return (NULL);
 
     sc->sc_sock_rmt = sock_rmt;
@@ -516,7 +499,8 @@ c_authenticator_create(int sock_srv, int sock_rmt)
 /*
  * Release stalled execution.
  */        
-    (void)(*cm->cm_wakeup)(cm, sc);
+    (void)(*c_authenticator_class.c_base.cm_wakeup)
+        (&c_authenticator_class.c_base, sc);
 
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
@@ -549,18 +533,14 @@ static int
 c_authenticator_destroy(void *arg) 
 {
     struct c_thr *thr;
-    struct c_class *this;
-    struct c_methods *cm;
-    
+
     if ((thr = arg) == NULL)
         return (-1);
-    
-    this = &c_authenticator_class;
-    cm = &this->c_base;
     
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */    
 
-    return ((*cm->cm_destroy)(this, thr));
+    return ((*c_authenticator_class.c_base.cm_destroy)
+        (&c_authenticator_class, thr));
 }
