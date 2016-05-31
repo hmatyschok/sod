@@ -109,10 +109,6 @@ static struct c_class c_authenticator_class = {
 static const char     *ca_prompt_default = C_AUTHENTICATOR_PROMPT_DFLT;
 static const char     *ca_pw_prompt_default = C_AUTHENTICATOR_PW_PROMPT_DFLT;
 
-/******************************************************************************
- * Class-methods.
- ******************************************************************************/
-
 /*
  * Initialize class properties and return public interface.
  */

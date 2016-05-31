@@ -72,10 +72,6 @@ static struct c_class c_obj_db_class = {
     },
 };
 
-/******************************************************************************
- * Class-methods.
- ******************************************************************************/
-
 /*
  * Initialize class properties and return public interface.
  */

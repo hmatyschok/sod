@@ -175,6 +175,37 @@ static struct c_class c_thr_class = {
     },
 };
 
+int 
+c_base_class_init(void *arg)
+{
+    if ((c_base_class.c_flags & C_INIT) ^ C_INIT) 
+        c_base_class.c_base = c_base;
+    
+    return (c_class_init(&c_base_class, arg));    
+}
+
+int 
+c_base_class_fini(void *arg)
+{
+
+    return (c_class_fini(&c_base_class, arg));    
+}
+
+int 
+c_thr_class_init(void *arg)
+{
+    if ((c_thr_class.c_flags & C_INIT) ^ C_INIT) 
+        c_thr_class.c_base = c_thr;
+    
+    return (c_class_init(&c_thr_class, arg));    
+}
+
+int 
+c_thr_class_fini(void *arg)
+{
+
+    return (c_class_fini(&c_thr_class, arg));    
+}
 
 /******************************************************************************
  * Private class-methods.
@@ -273,7 +304,7 @@ c_instances_free(struct c_class *cls)
 }
 
 /*
- * Generic class-methods.
+ * Initialize class.
  */
 
 static int
@@ -314,6 +345,11 @@ syslog(LOG_DEBUG, "%s: %ld\n", __func__, cls->c_id);
     return (0);
 }
 
+/*
+ * Finalize class, if any instance was 
+ * released then focussed class might
+ * be unregistered by its parent.
+ */
 static int 
 c_class_fini(void *arg0, void *arg1)
 {
@@ -355,9 +391,8 @@ syslog(LOG_DEBUG, "%s: %ld\n", __func__, cls->c_id);
     return (0);    
 }
 
-
 /******************************************************************************
- * Protected class-methods.
+ * Protected methods, c_thread_class
  ******************************************************************************/
 
 /*
@@ -614,6 +649,13 @@ c_thr_get(void *arg0, void *arg1)
     return (c_cache_get(arg0, arg1));
 }
 
+/******************************************************************************
+ * Protected methods, c_base_class
+ ******************************************************************************/
+
+/*
+ * XXX: incomplete...
+ */
 
 /*
  * Lock instance.
@@ -657,51 +699,8 @@ c_base_unlock(void *arg)
 
 
 /******************************************************************************
- * Public Class-methods.
+ * Protected methods, null-operations
  ******************************************************************************/
-
-int 
-c_base_class_init(void *arg)
-{
-    if ((c_base_class.c_flags & C_INIT) ^ C_INIT) 
-        c_base_class.c_base = c_base;
-    
-    return (c_class_init(&c_base_class, arg));    
-}
-
-int 
-c_base_class_fini(void *arg)
-{
-
-    return (c_class_fini(&c_base_class, arg));    
-}
-
-int 
-c_thr_class_init(void *arg)
-{
-    if ((c_thr_class.c_flags & C_INIT) ^ C_INIT) 
-        c_thr_class.c_base = c_thr;
-    
-    return (c_class_init(&c_thr_class, arg));    
-}
-
-int 
-c_thr_class_fini(void *arg)
-{
-
-    return (c_class_fini(&c_thr_class, arg));    
-}
-
-
-
-
-
-
-
-
-/*
- * Null-operations, object scope.
- */
 
 static void *
 c_nop_create(void *arg __unused)

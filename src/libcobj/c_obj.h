@@ -148,7 +148,7 @@ struct c_base {
  * Unnamed semaphore.
  */    
     sem_t       *cb_sem;
-    pid_t       *cb_pid;
+    pid_t       cb_pid;
 };
 
 /*

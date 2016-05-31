@@ -73,10 +73,6 @@ static struct c_class c_signal_class = {
     },
 };
 
-/******************************************************************************
- * Class-methods.
- ******************************************************************************/
-
 /*
  * Initialize class properties and return public interface.
  */
