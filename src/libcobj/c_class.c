@@ -261,6 +261,10 @@ c_cache_del(struct c_cache *ch, void *arg)
     return (co);
 }
 
+/*
+ * Finalize children. This routine is called 
+ * during runtime of c_class_fini.
+ */
 static int 
 c_children_free(struct c_class *cls0)
 {
@@ -520,7 +524,7 @@ c_thr_sleep(void *cm0, void *arg)
     if ((thr = arg) == NULL) 
         return (-1);
     
-    cm = (cm0) ? cm0 : &c_thr_class.c_base;
+    cm = (cm0 == NULL) ? &c_thr_class.c_base : cm0;
  
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
@@ -544,7 +548,7 @@ c_thr_wakeup(void *cm0, void *arg)
     if ((thr = arg) == NULL) 
         return (-1);
     
-    cm = (cm0) ? cm0 : &c_thr_class.c_base;
+    cm = (cm0 == NULL) ? &c_thr_class.c_base : cm0;
     
     (void)pthread_cond_signal(&thr->ct_cv);
     (void)(*cm->cm_unlock)(arg);
@@ -577,7 +581,7 @@ c_thr_wait(void *cm0, u_int ts, void *arg)
     if ((uts = (ts * 1000)) == 0)
         goto out;
     
-    cm = (cm0) ? cm0 : &c_thr_class.c_base;
+    cm = (cm0 == NULL) ? &c_thr_class.c_base : cm0;
     
     if ((eval = gettimeofday(&x, NULL)) == 0) {
         (void)(*cm->cm_lock)(arg);

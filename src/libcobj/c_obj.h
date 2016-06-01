@@ -53,7 +53,8 @@
 typedef void *  (*c_obj_fn_t)(DB *db, DBT *key, void *arg);
 typedef ssize_t     (*c_msg_fn_t)(int, struct msghdr *, int);
 
-typedef void *   (*c_obj_get_t)(void *, void *);
+typedef void *   (*c_instance_get_t)(void *, void *);
+typedef int   (*c_instance_add_t)(void *, void *);
 
 typedef void *    (*c_create_t)(void *);
 typedef void *    (*c_start_t)(void *);
@@ -108,7 +109,11 @@ struct c_methods {
     c_wait_t        cm_wait;
     c_stop_t         cm_stop;
     c_destroy_t         cm_destroy;
-    c_obj_get_t    cm_get;
+/*
+ * Accessor methods for instances
+ */    
+    c_instance_get_t    cm_get;
+    c_instance_add_t    cm_add;
 };
 #define C_BASE_METHODS     1463676933
 #define C_NOP_METHODS     1463677298
