@@ -120,7 +120,6 @@ static void *
 c_obj_db_start(void *arg)
 {
     struct c_obj_db_softc *sc;
-    struct c_class *this;
     
     if ((sc = arg) == NULL)
         goto out;
@@ -129,16 +128,14 @@ c_obj_db_start(void *arg)
 
     if (sc->sc_db == NULL)
         goto out;
-    
-    this = &c_obj_db_class;
 /*
- * On success, enter infinite loop and fell asleep.
+ * On success, enter infinite loop until db(3) not exists.
  */    
-    for (;;) {
-        if ((*this->c_base.cm_sleep)(&this->c_base, sc))
-            (void)(*this->c_base.cm_destroy)(this, sc);
+    for (;;) { 
+        if (sc->sc_db == NULL)
+            break;
     }    
-out:    
+out:
     return (NULL);
 }
 
@@ -151,8 +148,10 @@ c_obj_db_stop(void *arg)
     struct c_obj_db_softc *sc;
 
     if ((sc = arg) != NULL) {
-        if (sc->sc_db)
+        if (sc->sc_db != NULL) {
             (void)(*sc->sc_db->close)(sc->sc_db);
+            sc->sc_db = NULL;
+        }
     }
 }
 
@@ -187,18 +186,21 @@ c_obj_db_add(void *arg0, void *arg1)
 { 
     struct c_class *this;
     struct c_obj_db_softc *sc;
+    void *rv;
 
     this = &c_obj_db_class;
     sc = (*this->c_base.cm_get)(&this->c_instances, arg1);
     
     if (sc == NULL)
         return (NULL);
-/*
- * Release stalled execution.
- */ 
-    (void)(*this->c_base.cm_wakeup)(&this->c_base, sc);
- 
-    return (c_obj_fn(c_obj_add, sc->sc_db, arg0));
+        
+    (void)(*this->c_base.cm_lock)(sc);
+    
+    rv = c_obj_fn(c_obj_add, sc->sc_db, arg0);    
+    
+    (void)(*this->c_base.cm_unlock)(sc);
+        
+    return (rv);
 }
 
 /*
@@ -209,18 +211,21 @@ c_obj_db_get(void *arg0, void *arg1)
 { 
     struct c_class *this;
     struct c_obj_db_softc *sc;
+    void *rv;
 
     this = &c_obj_db_class;
     sc = (*this->c_base.cm_get)(&this->c_instances, arg1);
     
     if (sc == NULL)
         return (NULL);
-/*
- * Release stalled execution.
- */ 
-    (void)(*this->c_base.cm_wakeup)(&this->c_base, sc);
- 
-    return (c_obj_fn(c_obj_get, sc->sc_db, arg0));
+        
+    (void)(*this->c_base.cm_lock)(sc);
+    
+    rv = c_obj_fn(c_obj_get, sc->sc_db, arg0);    
+    
+    (void)(*this->c_base.cm_unlock)(sc);
+        
+    return (rv);
 }
 
 /*
@@ -231,18 +236,21 @@ c_obj_db_del(void *arg0, void *arg1)
 {
     struct c_class *this;
     struct c_obj_db_softc *sc;
+    void *rv;
 
     this = &c_obj_db_class;
     sc = (*this->c_base.cm_get)(&this->c_instances, arg1);
     
     if (sc == NULL)
         return (NULL);
-/*
- * Release stalled execution.
- */ 
-    (void)(*this->c_base.cm_wakeup)(&this->c_base, sc);
- 
-    return (c_obj_fn(c_obj_del, sc->sc_db, arg0));
+        
+    (void)(*this->c_base.cm_lock)(sc);
+    
+    rv = c_obj_fn(c_obj_del, sc->sc_db, arg0);    
+    
+    (void)(*this->c_base.cm_unlock)(sc);
+        
+    return (rv);
 }
 
 /*

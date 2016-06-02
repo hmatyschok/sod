@@ -48,9 +48,9 @@
 static int  c_children_free(struct c_class *);
 static int  c_instances_free(struct c_class *);
 
-static void *   c_cache_add(struct c_cache *, void *);
-static void *   c_cache_get(struct c_cache *, void *);
-static void *   c_cache_del(struct c_cache *, void *);
+static void *   c_cache_add(void *, void *);
+static void *   c_cache_get(void *, void *);
+static void *   c_cache_del(void *, void *);
 
 static int    c_class_init(void *, void *);
 static int     c_class_fini(void *, void *);
@@ -65,10 +65,6 @@ static int  c_thr_wakeup(void *, void *);
 static int  c_thr_sleep(void *, void *);
 static int  c_thr_wait(void *, u_int, void *);
 static int     c_thr_destroy(void *, void *);
-
-static void *   c_thr_add(void *, void *);
-static void *   c_thr_del(void *, void *);
-static void *   c_thr_get(void *, void *);
 
 static void *     c_nop_create(void *);
 static void *     c_nop_start(void *);
@@ -108,9 +104,9 @@ static struct c_methods c_nop = {
     .cm_wait        = c_nop_wait,
     .cm_stop         = c_nop_stop,
     .cm_destroy         = c_nop_destroy,
-    .cm_add         = c_nop_add,
-    .cm_del         = c_nop_del,
-    .cm_get         = c_nop_get,        
+    .cm_add         = c_cache_add,
+    .cm_del         = c_cache_del,
+    .cm_get         = c_cache_get,        
 }; 
 
 /*
@@ -131,9 +127,9 @@ static struct c_methods c_base = {
     .cm_wait        = c_nop_wait,
     .cm_stop         = c_nop_stop,
     .cm_destroy         = c_nop_destroy,
-    .cm_add         = c_nop_add,
-    .cm_del         = c_nop_del,
-    .cm_get         = c_nop_get,
+    .cm_add         = c_cache_add,
+    .cm_del         = c_cache_del,
+    .cm_get         = c_cache_get,
 }; 
 
 /*
@@ -155,9 +151,9 @@ static struct c_methods c_thr = {
     .cm_wait        = c_thr_wait,
     .cm_stop         = c_nop_stop,
     .cm_destroy         = c_thr_destroy,
-    .cm_add         = c_thr_add,
-    .cm_del         = c_thr_del,
-    .cm_get         = c_thr_get,
+    .cm_add         = c_cache_add,
+    .cm_del         = c_cache_del,
+    .cm_get         = c_cache_get,
 }; 
 
 /*
@@ -237,12 +233,18 @@ c_thr_class_fini(void *arg)
  * Insert object.
  */
 static void *
-c_cache_add(struct c_cache *ch, void *arg)
+c_cache_add(void *arg0, void *arg1)
 {    
     struct c_obj *co;
+    struct c_cache *ch;
     
-    if ((co = arg) != NULL)
-        TAILQ_INSERT_TAIL(ch, co, co_next);    
+    if ((co = arg1) == NULL)
+        return (NULL); 
+     
+    if ((ch = arg0) == NULL)
+        return (NULL);
+     
+    TAILQ_INSERT_TAIL(ch, co, co_next);    
     
     return (co);
 }
@@ -251,12 +253,16 @@ c_cache_add(struct c_cache *ch, void *arg)
  * Find requested object.
  */
 static void *     
-c_cache_get(struct c_cache *ch, void *arg)
+c_cache_get(void *arg0, void *arg1)
 {    
     struct c_obj *co, *co_tmp, *key;
+    struct c_cache *ch;
     
-    if ((key = arg) == NULL) 
+    if ((key = arg1) == NULL) 
         return (NULL);
+ 
+    if ((ch = arg0) == NULL)
+        return (NULL);   
  
     TAILQ_FOREACH_SAFE(co, ch, co_next, co_tmp) {
         if (co->co_id == key->co_id) 
@@ -269,11 +275,18 @@ c_cache_get(struct c_cache *ch, void *arg)
  * Fetch requested object.
  */
 static void *     
-c_cache_del(struct c_cache *ch, void *arg)
+c_cache_del(void *arg0, void *arg1)
 {    
     struct c_obj *co;
-
-    if ((co = c_cache_get(ch, arg)) != NULL)
+    struct c_cache *ch;
+    
+    if ((co = arg1) == NULL)
+        return (NULL); 
+     
+    if ((ch = arg0) == NULL)
+        return (NULL);
+    
+    if ((co = c_cache_get(ch, co)) != NULL)
         TAILQ_REMOVE(ch, co, co_next);
     
     return (co);
@@ -350,7 +363,7 @@ c_class_init(void *arg0, void *arg1)
 /*
  * Register child by its parent.
  */
-            if ((*cls0->c_base.cm_add)(&cls0->c_children, cls) == NULL) 
+            if (c_cache_add(&cls0->c_children, cls) == NULL) 
                 return (-1);
             
             cls->c_base = cls0->c_base;
@@ -399,7 +412,7 @@ c_class_fini(void *arg0, void *arg1)
 /*
  * Unregister cls by its parent cls0.
  */            
-            if ((*cls0->c_base.cm_del)(&cls0->c_children, cls) == NULL) 
+            if (c_cache_del(&cls0->c_children, cls) == NULL) 
                 return (-1);
             
             cls->c_base = c_nop;
@@ -470,7 +483,7 @@ c_thr_create(void *arg)
     
     thr->ct_len = cls->c_len;
     
-    if ((*cls->c_base.cm_add)(&cls->c_instances, thr) == NULL) 
+    if (c_cache_add(&cls->c_instances, thr) == NULL) 
         goto bad3;
 
 #ifdef C_OBJ_DEBUG        
@@ -646,7 +659,7 @@ c_thr_destroy(void *arg0, void *arg1)
 /*
  * Release object from database, if any.
  */    
-    if ((thr = (*cls->c_base.cm_del)(&cls->c_instances, thr)) != NULL)
+    if ((thr = c_cache_del(&cls->c_instances, thr)) != NULL)
         free(thr);
 
 #ifdef C_OBJ_DEBUG        
@@ -654,27 +667,6 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */    
 
     return (0);
-}
-
-static void * 
-c_thr_add(void *arg0, void *arg1)
-{
- 
-    return (c_cache_add(arg0, arg1));
-}
-
-static void * 
-c_thr_del(void *arg0, void *arg1)
-{
- 
-    return (c_cache_del(arg0, arg1));
-}
-
-static void * 
-c_thr_get(void *arg0, void *arg1)
-{
- 
-    return (c_cache_get(arg0, arg1));
 }
 
 /******************************************************************************
