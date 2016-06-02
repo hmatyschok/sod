@@ -363,7 +363,7 @@ c_class_init(void *arg0, void *arg1)
 /*
  * Register child by its parent.
  */
-            if (c_cache_add(&cls0->c_children, cls) == NULL) 
+            if ((*cls0->c_base.cm_add)(&cls0->c_children, cls) == NULL) 
                 return (-1);
             
             cls->c_base = cls0->c_base;
@@ -412,7 +412,7 @@ c_class_fini(void *arg0, void *arg1)
 /*
  * Unregister cls by its parent cls0.
  */            
-            if (c_cache_del(&cls0->c_children, cls) == NULL) 
+            if ((*cls0->c_base.cm_del)(&cls0->c_children, cls) == NULL) 
                 return (-1);
             
             cls->c_base = c_nop;
@@ -483,7 +483,7 @@ c_thr_create(void *arg)
     
     thr->ct_len = cls->c_len;
     
-    if (c_cache_add(&cls->c_instances, thr) == NULL) 
+    if ((*cls->c_base.cm_add)(&cls->c_instances, thr) == NULL) 
         goto bad3;
 
 #ifdef C_OBJ_DEBUG        
@@ -659,7 +659,7 @@ c_thr_destroy(void *arg0, void *arg1)
 /*
  * Release object from database, if any.
  */    
-    if ((thr = c_cache_del(&cls->c_instances, thr)) != NULL)
+    if ((thr = (*cls->c_base.cm_del)(&cls->c_instances, thr)) != NULL)
         free(thr);
 
 #ifdef C_OBJ_DEBUG        
