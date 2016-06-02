@@ -50,7 +50,7 @@ struct c_signal_softc {
 #define C_SIGNAL_LEN (sizeof(struct c_signal_softc))
 
 static void *     c_signal_start(void *); 
-static int     c_signal_stop(void *);
+static void     c_signal_stop(void *);
 
 static void *     c_signal_create(void);
 static int     c_signal_sigmask(int, void *);
@@ -150,11 +150,10 @@ out:
 /*
  * Implecitely called cleanup handler.
  */
-static int  
+static void  
 c_signal_stop(void *arg)
 {
 
-    return (0);
 }
 
 /******************************************************************************

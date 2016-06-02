@@ -58,7 +58,6 @@ static int     c_class_fini(void *, void *);
 static int  c_base_lock(void *);
 static int  c_base_unlock(void *);
 
-
 static void *     c_thr_create(void *);
 static int  c_thr_lock(void *);
 static int  c_thr_unlock(void *);
@@ -67,6 +66,8 @@ static int  c_thr_sleep(void *, void *);
 static int  c_thr_wait(void *, u_int, void *);
 static int     c_thr_destroy(void *, void *);
 
+static void *   c_thr_add(void *, void *);
+static void *   c_thr_del(void *, void *);
 static void *   c_thr_get(void *, void *);
 
 static void *     c_nop_create(void *);
@@ -79,9 +80,11 @@ static int  c_nop_sleep(void *, void *);
 static int  c_nop_wakeup(void *, void *);
 static int  c_nop_wait(void *, u_int, void *);
 
-static int     c_nop_stop(void *);
+static void     c_nop_stop(void *);
 static int     c_nop_destroy(void *, void *);
 
+static void *   c_nop_add(void *, void *);
+static void *   c_nop_del(void *, void *);
 static void *   c_nop_get(void *, void *);
 
 /******************************************************************************
@@ -105,7 +108,9 @@ static struct c_methods c_nop = {
     .cm_wait        = c_nop_wait,
     .cm_stop         = c_nop_stop,
     .cm_destroy         = c_nop_destroy,
-    .cm_get         = c_nop_get,
+    .cm_add         = c_nop_add,
+    .cm_del         = c_nop_del,
+    .cm_get         = c_nop_get,        
 }; 
 
 /*
@@ -126,6 +131,8 @@ static struct c_methods c_base = {
     .cm_wait        = c_nop_wait,
     .cm_stop         = c_nop_stop,
     .cm_destroy         = c_nop_destroy,
+    .cm_add         = c_nop_add,
+    .cm_del         = c_nop_del,
     .cm_get         = c_nop_get,
 }; 
 
@@ -148,8 +155,9 @@ static struct c_methods c_thr = {
     .cm_wait        = c_thr_wait,
     .cm_stop         = c_nop_stop,
     .cm_destroy         = c_thr_destroy,
+    .cm_add         = c_thr_add,
+    .cm_del         = c_thr_del,
     .cm_get         = c_thr_get,
-
 }; 
 
 /*
@@ -178,33 +186,47 @@ static struct c_class c_thr_class = {
 int 
 c_base_class_init(void *arg)
 {
-    if ((c_base_class.c_flags & C_INIT) ^ C_INIT) 
-        c_base_class.c_base = c_base;
+    struct c_class *cls0;
     
-    return (c_class_init(&c_base_class, arg));    
+    cls0 = &c_base_class;
+    
+    if ((cls0->c_flags & C_INIT) ^ C_INIT) 
+        cls0->c_base = c_base;
+    
+    return (c_class_init(cls0, arg));    
 }
 
 int 
 c_base_class_fini(void *arg)
 {
+    struct c_class *cls0;
+    
+    cls0 = &c_base_class;
 
-    return (c_class_fini(&c_base_class, arg));    
+    return (c_class_fini(cls0, arg));    
 }
 
 int 
 c_thr_class_init(void *arg)
 {
-    if ((c_thr_class.c_flags & C_INIT) ^ C_INIT) 
-        c_thr_class.c_base = c_thr;
+    struct c_class *cls0;
     
-    return (c_class_init(&c_thr_class, arg));    
+    cls0 = &c_thr_class;
+    
+    if ((cls0->c_flags & C_INIT) ^ C_INIT) 
+        cls0->c_base = c_thr;
+    
+    return (c_class_init(cls0, arg));    
 }
 
 int 
 c_thr_class_fini(void *arg)
 {
-
-    return (c_class_fini(&c_thr_class, arg));    
+    struct c_class *cls0;
+    
+    cls0 = &c_thr_class;
+    
+    return (c_class_fini(cls0, arg));    
 }
 
 /******************************************************************************
@@ -219,10 +241,8 @@ c_cache_add(struct c_cache *ch, void *arg)
 {    
     struct c_obj *co;
     
-    if ((co = arg) == NULL)
-        return (NULL);
-
-    TAILQ_INSERT_TAIL(ch, co, co_next);    
+    if ((co = arg) != NULL)
+        TAILQ_INSERT_TAIL(ch, co, co_next);    
     
     return (co);
 }
@@ -237,11 +257,11 @@ c_cache_get(struct c_cache *ch, void *arg)
     
     if ((key = arg) == NULL) 
         return (NULL);
-    
+ 
     TAILQ_FOREACH_SAFE(co, ch, co_next, co_tmp) {
         if (co->co_id == key->co_id) 
             break;
-    }
+    } 
     return (co);
 }
 
@@ -252,12 +272,10 @@ static void *
 c_cache_del(struct c_cache *ch, void *arg)
 {    
     struct c_obj *co;
-    
-    co = c_cache_get(ch, arg);
 
-    if (co)
+    if ((co = c_cache_get(ch, arg)) != NULL)
         TAILQ_REMOVE(ch, co, co_next);
-           
+    
     return (co);
 }
 
@@ -266,42 +284,37 @@ c_cache_del(struct c_cache *ch, void *arg)
  * during runtime of c_class_fini.
  */
 static int 
-c_children_free(struct c_class *cls0)
+c_children_free(struct c_class *cls)
 {
-    struct c_cache *ch;
-    struct c_obj *cls;
+    struct c_obj *co;
 
-    if (cls0 == NULL)
+    if (cls == NULL)
         return (-1);
-    
-    ch = &cls0->c_children;
 
-    while (!TAILQ_EMPTY(ch)) {
-        cls = TAILQ_FIRST(ch);
+    while (!TAILQ_EMPTY(&cls->c_children)) {
+        co = TAILQ_FIRST(&cls->c_children);
         
-        if (c_class_fini(cls0, cls))
+        if (c_class_fini(cls, co))
             return (-1);
     }
     return (0);
 }
 
+/*
+ * Finalize instances maps to focussed class.
+ */
 static int 
 c_instances_free(struct c_class *cls)
 {
-    struct c_methods *cm;
-    struct c_cache *ch;
     struct c_obj *co;
 
     if (cls == NULL)
         return (-1);
-    
-    cm = &cls->c_base;
-    ch = &cls->c_instances;
 
-    while (!TAILQ_EMPTY(ch)) {
-        co = TAILQ_FIRST(ch);
+    while (!TAILQ_EMPTY(&cls->c_instances)) {
+        co = TAILQ_FIRST(&cls->c_instances);
         
-        if ((*cm->cm_destroy)(cls, co))
+        if ((*cls->c_base.cm_destroy)(cls, co))
             return (-1);
     }
     return (0);
@@ -314,8 +327,8 @@ c_instances_free(struct c_class *cls)
 static int
 c_class_init(void *arg0, void *arg1)
 {
-    struct c_class *cls0;
-    struct c_class *cls;
+    struct c_class *cls0;   /* base class */
+    struct c_class *cls;    /* child */   
     
     if ((cls = arg1) == NULL) 
         cls = arg0;
@@ -334,7 +347,10 @@ c_class_init(void *arg0, void *arg1)
         TAILQ_INIT(&cls->c_instances);
        
         if (cls != cls0) { 
-            if (c_cache_add(&cls0->c_children, cls) == NULL) 
+/*
+ * Register child by its parent.
+ */
+            if ((*cls0->c_base.cm_add)(&cls0->c_children, cls) == NULL) 
                 return (-1);
             
             cls->c_base = cls0->c_base;
@@ -380,7 +396,10 @@ c_class_fini(void *arg0, void *arg1)
             return (-1);
 
         if (cls != cls0) { 
-            if (c_cache_del(&cls0->c_children, cls) == NULL) 
+/*
+ * Unregister cls by its parent cls0.
+ */            
+            if ((*cls0->c_base.cm_del)(&cls0->c_children, cls) == NULL) 
                 return (-1);
             
             cls->c_base = c_nop;
@@ -416,18 +435,18 @@ syslog(LOG_DEBUG, "%s: %ld\n", __func__, cls->c_id);
 static void *
 c_thr_create(void *arg)
 {
-    struct c_thr *thr = NULL;
+    struct c_thr *thr;
     struct c_class *cls;
 /*
  * Apply various condition tests.
  */    
     if ((cls = arg) == NULL)
-        goto out;
+        return (NULL);  
 /*
  * An abstract component cannot instantiate itself.
  */
-    if (cls->c_id == c_base_class.c_id)
-        goto out;
+    if (cls->c_len < c_thr_class.c_len)
+        return (NULL);
 /*
  * Allocate.
  */
@@ -442,19 +461,17 @@ c_thr_create(void *arg)
     if (pthread_mutex_init(&thr->ct_mtx, NULL))
         goto bad1;
 /*
- * If successfull, then create running pthread(3) instance.
+ * On success, create running pthread(3) instance.
  */    
-    if (pthread_create(&thr->ct_tid, NULL, cls->c_base.cm_start, thr) != 0) 
+    if (pthread_create(&thr->ct_tid, NULL, cls->c_base.cm_start, thr)) 
         goto bad2;
 
     (void)memcpy(&thr->ct_id, thr->ct_tid, sizeof(thr->ct_id));
     
     thr->ct_len = cls->c_len;
     
-    if (c_cache_add(&cls->c_instances, thr) == NULL) {
-        (void)pthread_cancel(thr->ct_tid);
-        goto bad2;
-    }
+    if ((*cls->c_base.cm_add)(&cls->c_instances, thr) == NULL) 
+        goto bad3;
 
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
@@ -462,6 +479,8 @@ syslog(LOG_DEBUG, "%s\n", __func__);
     
 out:        
     return (thr);
+bad3:    
+    (void)pthread_cancel(thr->ct_tid);
 bad2:    
     (void)pthread_mutex_destroy(&thr->ct_mtx);
 bad1:
@@ -578,10 +597,10 @@ c_thr_wait(void *cm0, u_int ts, void *arg)
     if ((thr = arg) == NULL) 
         goto out;
     
+    cm = (cm0 == NULL) ? &c_thr_class.c_base : cm0;
+    
     if ((uts = (ts * 1000)) == 0)
         goto out;
-    
-    cm = (cm0 == NULL) ? &c_thr_class.c_base : cm0;
     
     if ((eval = gettimeofday(&x, NULL)) == 0) {
         (void)(*cm->cm_lock)(arg);
@@ -605,23 +624,18 @@ out:
 static int
 c_thr_destroy(void *arg0, void *arg1)
 {
-    int eval = -1;
-    
     struct c_class *cls;
     struct c_thr *thr;
 
     if ((thr = arg1) == NULL)    
-        goto out;
-/*
- * Apply various condition tests.
- */    
+        return (-1);
+ 
     if ((cls = arg0) == NULL)
-        goto out;
+        return (-1);
 /*
- * An abstract component cannot be destroyed.
+ * Finalize properties at focussed instance.
  */
-    if (cls->c_id == c_base_class.c_id)
-        goto out;
+    (*cls->c_base.cm_stop)(thr);
 /*
  * Release pthread(3). This operation can't fail because
  * returned ESRCH means that there was no pthread(3). 
@@ -630,20 +644,30 @@ c_thr_destroy(void *arg0, void *arg1)
     (void)pthread_cond_destroy(&thr->ct_cv);
     (void)pthread_mutex_destroy(&thr->ct_mtx);
 /*
- * Release object from database.
+ * Release object from database, if any.
  */    
-    thr = c_cache_del(&cls->c_instances, thr);
-    if (thr) {
-        eval = (*cls->c_base.cm_stop)(thr);
-        free(thr);    
-    }
-    
+    if ((thr = (*cls->c_base.cm_del)(&cls->c_instances, thr)) != NULL)
+        free(thr);
+
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */    
 
-out:        
-    return (eval);
+    return (0);
+}
+
+static void * 
+c_thr_add(void *arg0, void *arg1)
+{
+ 
+    return (c_cache_add(arg0, arg1));
+}
+
+static void * 
+c_thr_del(void *arg0, void *arg1)
+{
+ 
+    return (c_cache_del(arg0, arg1));
 }
 
 static void * 
@@ -756,11 +780,10 @@ c_nop_wait(void *cm0 __unused, u_int ts __unused , void *arg __unused)
     return (-1);
 }
 
-static int     
+static void     
 c_nop_stop(void *arg __unused)
 {
 
-    return (-1);
 }
 
 static int     
@@ -770,11 +793,27 @@ c_nop_destroy(void *arg0 __unused, void *arg1 __unused)
     return (-1);
 }
 
+
+static void * 
+c_nop_add(void *arg0 __unused, void *arg1 __unused)
+{
+ 
+    return (NULL);
+}
+
+static void * 
+c_nop_del(void *arg0 __unused, void *arg1 __unused)
+{
+ 
+    return (NULL);
+}
+
 static void * 
 c_nop_get(void *arg0 __unused, void *arg1 __unused)
 {
  
     return (NULL);
 }
+
 
 

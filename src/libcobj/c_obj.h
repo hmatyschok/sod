@@ -53,8 +53,9 @@
 typedef void *  (*c_obj_fn_t)(DB *db, DBT *key, void *arg);
 typedef ssize_t     (*c_msg_fn_t)(int, struct msghdr *, int);
 
+typedef void *   (*c_instance_add_t)(void *, void *);
+typedef void *   (*c_instance_del_t)(void *, void *);
 typedef void *   (*c_instance_get_t)(void *, void *);
-typedef int   (*c_instance_add_t)(void *, void *);
 
 typedef void *    (*c_create_t)(void *);
 typedef void *    (*c_start_t)(void *);
@@ -66,7 +67,7 @@ typedef int     (*c_sleep_t)(void *, void *);
 typedef int     (*c_wakeup_t)(void *, void *);
 typedef int     (*c_wait_t)(void *, u_int, void *);
 
-typedef int     (*c_stop_t)(void *);
+typedef void     (*c_stop_t)(void *);
 typedef int     (*c_destroy_t)(void *, void *);
  
 /*
@@ -112,8 +113,9 @@ struct c_methods {
 /*
  * Accessor methods for instances
  */    
-    c_instance_get_t    cm_get;
     c_instance_add_t    cm_add;
+    c_instance_get_t    cm_del;
+    c_instance_get_t    cm_get;
 };
 #define C_BASE_METHODS     1463676933
 #define C_NOP_METHODS     1463677298
@@ -128,17 +130,19 @@ struct c_class {
 #define c_id        c_co.co_id
 #define c_len       c_co.co_len
 #define c_flags     c_co.co_flags
-    struct c_cache         c_children;
-    struct c_cache         c_instances;
 /*
  * From parent inherited interface.
  */
-    struct c_methods         c_base;
+    struct c_methods         c_base;    
+/*
+ * Cache.
+ */
+    struct c_cache         c_children;
+    struct c_cache         c_instances;
+
 };
 #define C_BASE_CLASS     1463676824
 #define C_THR_CLASS     1464519469
-#define C_BASE_LEN     (sizeof(struct c_class))
-#define C_THR_LEN     (sizeof(struct c_class))
 
 /*
  * Generic instance.
@@ -155,6 +159,7 @@ struct c_base {
     sem_t       *cb_sem;
     pid_t       cb_pid;
 };
+#define C_BASE_LEN     (sizeof(struct c_base))
 
 /*
  * By pthread(3) covered instance.
@@ -172,6 +177,7 @@ struct c_thr {
     pthread_mutex_t     ct_mtx;
     pthread_t     ct_tid;
 };
+#define C_THR_LEN     (sizeof(struct c_thr))
 
 /*
  * MPI encapsulates message token.

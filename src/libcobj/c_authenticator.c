@@ -83,7 +83,7 @@ static ca_state_fn_t     c_authenticator_authenticate(void *);
 static ca_state_fn_t     c_authenticator_establish(void *);
 
 static void *     c_authenticator_start(void *); 
-static int     c_authenticator_stop(void *);
+static void     c_authenticator_stop(void *);
 
 static void *     c_authenticator_create(int, int);
 static int     c_authenticator_join(void *);
@@ -463,24 +463,18 @@ out:
 /*
  * Implecitely called cleanup handler.
  */
-static int  
+static void  
 c_authenticator_stop(void *arg)
 {
-    struct ca_softc *sc = NULL;
+    struct ca_softc *sc;
 
-    if ((sc = arg) == NULL) 
-        return (-1);
+    if ((sc = arg) != NULL) {
 
-    if (sc->sc_pamh != NULL)
-        (void)pam_end(sc->sc_pamh, sc->sc_eval);
+        if (sc->sc_pamh != NULL)
+            (void)pam_end(sc->sc_pamh, sc->sc_eval);
 
-    (void)close(sc->sc_sock_rmt);
-
-#ifdef C_OBJ_DEBUG        
-syslog(LOG_DEBUG, "%s\n", __func__);
-#endif /* C_OBJ_DEBUG */
-
-    return (0);
+        (void)close(sc->sc_sock_rmt);
+    }
 }
 
 /******************************************************************************

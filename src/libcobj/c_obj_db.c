@@ -45,7 +45,7 @@ struct c_obj_db_softc {
 #define C_OBJ_DB_LEN (sizeof(struct c_obj_db_softc))
 
 static void *     c_obj_db_start(void *); 
-static int     c_obj_db_stop(void *);
+static void     c_obj_db_stop(void *);
 
 static void *     c_obj_db_create(void);
 static void *     c_obj_db_add(void *, void *);
@@ -91,7 +91,7 @@ c_obj_db_class_init(void)
 
     this->c_base.cm_start = c_obj_db_start;
     this->c_base.cm_stop = c_obj_db_stop;
-    
+
     return (&c_obj_db_methods);    
 }
 
@@ -145,18 +145,15 @@ out:
 /*
  * Implecitely called cleanup handler.
  */
-static int  
+static void  
 c_obj_db_stop(void *arg)
 {
-    struct c_obj_db_softc *sc = NULL;
+    struct c_obj_db_softc *sc;
 
-    if ((sc = arg) == NULL) 
-        return (-1);
-
-    if (sc->sc_db)
-        (void)(*sc->sc_db->close)(sc->sc_db);
-
-    return (0);
+    if ((sc = arg) != NULL) {
+        if (sc->sc_db)
+            (void)(*sc->sc_db->close)(sc->sc_db);
+    }
 }
 
 /******************************************************************************
