@@ -90,8 +90,8 @@ c_signal_class_init(void)
    if (c_thr_class_init(this))
         return (NULL);
 
-    this->c_base.cm_start = c_signal_start;
-    this->c_base.cm_stop = c_signal_stop;
+    this->c_start = c_signal_start;
+    this->c_stop = c_signal_stop;
     
     return (&c_signal_methods);    
 }
@@ -170,7 +170,7 @@ c_signal_create(void)
     struct c_signal_softc *sc;
     
     this = &c_signal_class;
-    sc = (*this->c_base.cm_create)(this);
+    sc = (*this->c_create)(this);
     
     if (sc == NULL)
         goto bad;
@@ -183,7 +183,7 @@ c_signal_create(void)
     
     return (&sc->sc_thr);
 bad1:    
-    (void)(*this->c_base.cm_destroy)(this, sc);
+    (void)(*this->c_destroy)(this, sc);
 bad:
     return (NULL);
 }
@@ -198,7 +198,7 @@ c_signal_sigmask(int how, void *arg)
     struct c_signal_softc *sc;
    
     this = &c_signal_class;
-    sc = (*this->c_base.cm_get)(&this->c_instances, arg);
+    sc = (*this->c_obj_get)(&this->c_instances, arg);
     
     if (sc == NULL)
         return (-1);
@@ -228,7 +228,7 @@ c_signal_destroy(void *arg)
 
     this = &c_signal_class;
 
-    return ((*this->c_base.cm_destroy)(this, thr));
+    return ((*this->c_destroy)(this, thr));
 }
 
 

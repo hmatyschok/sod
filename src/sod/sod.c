@@ -171,7 +171,15 @@ main(int argc, char **argv)
 
     if (bind(fd, (struct sockaddr *)sun, len) < 0)
         sod_errx(EX_OSERR, "Can't bind %s", sun->sun_path);    
-
+/*
+ * XXX:
+ * XXX: Missing exception hnadling focussed on 
+ * XXX:
+ * XXX:  SO_SNDTIMEO -set timeout value for output
+ * XXX:  csshjsolidSO_RCVTIMEO - set timeout value for input
+ * XXX:
+ * XXX: service primitves.
+ */
     if (listen(fd, C_MSG_QLEN) < 0) 
         sod_errx(EX_OSERR, "Can't listen %s", sun->sun_path);
 /*

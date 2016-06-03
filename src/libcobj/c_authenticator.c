@@ -58,8 +58,8 @@ struct ca_softc {
     struct c_thr     sc_thr;     /* binding, pthread(3) */
 #define sc_id     sc_thr.ct_co.co_id
 #define sc_len     sc_thr.ct_co.co_len    
-    char sc_hname[C_NMAX + 1];
-    char sc_uname[C_NMAX + 1];
+    char sc_host[C_NMAX + 1];
+    char sc_user[C_NMAX + 1];
     const char     *sc_prompt;
     const char     *sc_pw_prompt;
     
@@ -126,8 +126,8 @@ c_authenticator_class_init(void)
     if (c_thr_class_init(this))
         return (NULL);
 
-    this->c_base.cm_start = c_authenticator_start;
-    this->c_base.cm_stop = c_authenticator_stop;
+    this->c_start = c_authenticator_start;
+    this->c_stop = c_authenticator_stop;
 
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
@@ -268,8 +268,8 @@ c_authenticator_start(void *arg)
     
     this = &c_authenticator_class;
     
-    if ((*this->c_base.cm_sleep)
-        (&this->c_base, sc) == 0)
+    if ((*this->c_sleep)
+        (this, sc) == 0)
         fn = (ca_state_t)c_authenticator_establish;    
 
 #ifdef C_OBJ_DEBUG        
@@ -314,8 +314,8 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 /*
  * Create < hostname, user > tuple.
  */
-    if (gethostname(sc->sc_hname, C_NMAX) == 0) 
-        (void)strncpy(sc->sc_uname, sc->sc_buf.msg_tok, C_NMAX);
+    if (gethostname(sc->sc_host, C_NMAX) == 0) 
+        (void)strncpy(sc->sc_user, sc->sc_buf.msg_tok, C_NMAX);
     else
         state = NULL;
 out:    
@@ -364,7 +364,7 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 /*
  * Verify, if username exists in passwd database. 
  */
-    if ((sc->sc_pwd = getpwnam(sc->sc_uname)) != NULL) {
+    if ((sc->sc_pwd = getpwnam(sc->sc_user)) != NULL) {
 /*
  * Verify, if user has UID 0, because login by UID 0 is not allowed. 
  */
@@ -384,17 +384,17 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 /*
  * Service name for pam(8) is defined implecitely.
  */        
-        sc->sc_eval = pam_start(__func__, sc->sc_uname, 
+        sc->sc_eval = pam_start(__func__, sc->sc_user, 
             &sc->sc_pamc, &sc->sc_pamh);
 
         if (sc->sc_eval == PAM_SUCCESS) {
             sc->sc_eval = pam_set_item(sc->sc_pamh, PAM_RUSER, 
-                sc->sc_uname);
+                sc->sc_user);
         }
     
         if (sc->sc_eval == PAM_SUCCESS) {
             sc->sc_eval = pam_set_item(sc->sc_pamh, PAM_RHOST, 
-                sc->sc_hname);
+                sc->sc_host);
         }
     
         if (sc->sc_eval == PAM_SUCCESS) {
@@ -402,7 +402,6 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 /*
  * Authenticate.
  */
-            
             if (sc->sc_eval == PAM_AUTH_ERR) {                
 /*
  * Reenter loop, if PAM_AUTH_ERR condition halts. 
@@ -410,9 +409,7 @@ syslog(LOG_DEBUG, "%s\n", __func__);
                 cnt += 1;    
         
                 if (cnt > backoff) 
-                    (*this->c_base.cm_wait)
-                        (&this->c_base, 
-                            (u_int)((cnt - backoff) * 5), sc);
+                    (*this->c_wait)((u_int)((cnt - backoff) * 5), this, sc);
         
                 if (cnt >= retries)
                     ask = 0;        
@@ -433,7 +430,7 @@ syslog(LOG_DEBUG, "%s\n", __func__);
     if (sc->sc_eval == PAM_SUCCESS) 
         resp = C_AUTHENTICATOR_AUTH_ACK;
             
-    c_msg_prepare(sc->sc_uname, resp, sc->sc_id, &sc->sc_buf);
+    c_msg_prepare(sc->sc_user, resp, sc->sc_id, &sc->sc_buf);
     state = (ca_state_fn_t)c_authenticator_response;
 out:    
     return (state);
@@ -491,7 +488,7 @@ c_authenticator_create(int sock_srv, int sock_rmt)
     struct ca_softc *sc;
     
     this = &c_authenticator_class;
-    sc = (*this->c_base.cm_create)(this);
+    sc = (*this->c_create)(this);
     
     if (sc == NULL) 
         return (NULL);
@@ -503,8 +500,7 @@ c_authenticator_create(int sock_srv, int sock_rmt)
 /*
  * Release stalled execution.
  */        
-    (void)(*this->c_base.cm_wakeup)
-        (&this->c_base, sc);
+    (void)(*this->c_wakeup)(this, sc);
 
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
@@ -548,5 +544,5 @@ c_authenticator_destroy(void *arg)
 syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */    
 
-    return ((*this->c_base.cm_destroy)(this, thr));
+    return ((*this->c_destroy)(this, thr));
 }

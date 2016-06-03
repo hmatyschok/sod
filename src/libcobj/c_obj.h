@@ -50,13 +50,16 @@
 #define C_MSG_NAK     0x00000020
 #define C_MSG_REJ     0x00000030
 
+/*
+ * Accessor methods for objects.
+ */ 
 typedef void *  (*c_obj_fn_t)(DB *db, DBT *key, void *arg);
 typedef ssize_t     (*c_msg_fn_t)(int, struct msghdr *, int);
+typedef void *   (*c_class_fn_t)(void *, void *);
 
-typedef void *   (*c_instance_add_t)(void *, void *);
-typedef void *   (*c_instance_del_t)(void *, void *);
-typedef void *   (*c_instance_get_t)(void *, void *);
-
+/*
+ * Methods implements life-cycle of an instance.  
+ */ 
 typedef void *    (*c_create_t)(void *);
 typedef void *    (*c_start_t)(void *);
 
@@ -65,7 +68,7 @@ typedef int     (*c_unlock_t)(void *);
 
 typedef int     (*c_sleep_t)(void *, void *);
 typedef int     (*c_wakeup_t)(void *, void *);
-typedef int     (*c_wait_t)(void *, u_int, void *);
+typedef int     (*c_wait_t)(u_int, void *, void *);
 
 typedef void     (*c_stop_t)(void *);
 typedef int     (*c_destroy_t)(void *, void *);
@@ -82,8 +85,7 @@ struct c_obj {
     long     co_id;     /* identifier */
     ssize_t     co_len;
     int         co_flags;
-#define C_INIT  0x00000001    
-#define C_LOCKED    0x00000002
+#define C_INIT  0x00000001   
 #define C_BASE    0x00000010
 #define C_THR    0x00000020
     TAILQ_ENTRY(c_obj) co_next;
@@ -93,56 +95,42 @@ TAILQ_HEAD(c_cache, c_obj);
 /*
  * Implements generic interface. 
  */
-struct c_methods {
-    struct c_obj         cm_co;
-#define cm_id       cm_co.co_id
-#define cm_len      cm_co.co_len
-#define cm_flags    cm_co.co_flags
-/*
- * Methods implemets life-cycle of an instance.  
- */    
-    c_create_t         cm_create;
-    c_start_t         cm_start;
-    c_lock_t        cm_lock;
-    c_unlock_t        cm_unlock;
-    c_sleep_t        cm_sleep;    
-    c_wakeup_t        cm_wakeup;    
-    c_wait_t        cm_wait;
-    c_stop_t         cm_stop;
-    c_destroy_t         cm_destroy;
-/*
- * Accessor methods for instances
- */    
-    c_instance_add_t    cm_add;
-    c_instance_get_t    cm_del;
-    c_instance_get_t    cm_get;
-};
-#define C_BASE_METHODS     1463676933
-#define C_NOP_METHODS     1463677298
-#define C_THR_METHODS     1464518536
-#define C_METHODS_LEN     (sizeof(struct c_methods))
-
-/*
- * Implements class.
- */
+ 
 struct c_class {
     struct c_obj         c_co;
 #define c_id        c_co.co_id
 #define c_len       c_co.co_len
 #define c_flags     c_co.co_flags
 /*
- * From parent inherited interface.
- */
-    struct c_methods         c_base;    
-/*
  * Cache.
- */
-    struct c_cache         c_children;
-    struct c_cache         c_instances;
-
+ */    
+    struct c_cache  c_children;
+    struct c_cache  c_instances;
+/*
+ * Accessor methods for children
+ */ 
+    c_class_fn_t    c_class_add;
+    c_class_fn_t    c_class_del; 
+/*
+ * Accessor methods for instances
+ */    
+    c_class_fn_t    c_obj_add;
+    c_class_fn_t    c_obj_del;
+    c_class_fn_t    c_obj_get;  
+/*
+ * Methods implements life-cycle of an instance.  
+ */    
+    c_create_t         c_create;
+    c_start_t         c_start;
+    c_lock_t        c_lock;
+    c_unlock_t        c_unlock;
+    c_sleep_t        c_sleep;    
+    c_wakeup_t        c_wakeup;    
+    c_wait_t        c_wait;
+    c_stop_t         c_stop;
+    c_destroy_t         c_destroy;
 };
-#define C_BASE_CLASS     1463676824
-#define C_THR_CLASS     1464519469
+#define C_NOP_CLASS     1464994078
 
 /*
  * Generic instance.
@@ -159,6 +147,7 @@ struct c_base {
     sem_t       *cb_sem;
     pid_t       cb_pid;
 };
+#define C_BASE_CLASS     1463676824
 #define C_BASE_LEN     (sizeof(struct c_base))
 
 /*
@@ -177,6 +166,7 @@ struct c_thr {
     pthread_mutex_t     ct_mtx;
     pthread_t     ct_tid;
 };
+#define C_THR_CLASS     1464519469
 #define C_THR_LEN     (sizeof(struct c_thr))
 
 /*
