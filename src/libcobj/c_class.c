@@ -731,7 +731,7 @@ c_base_wakeup(void *cls0 __unused, void *arg)
 /*
  * XXX: This is wrong, because sem_post(3) 
  * XXX: might be called during runtime of  
- * XXX: signal handler.
+ * XXX: signal handler on signal(3).
  */    
     return (sem_post(&base->cb_sem));
 }

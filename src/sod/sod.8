@@ -63,18 +63,4 @@ bridge.
 .Sh BUGS
 There exists no proper options. Only access to authentication services 
 based on (local) user database are provided, yet. 
-.Pp
-Due to the early implementation status of this daemon, 
-.Xr c_obj 3 and
-.Xr c_authenticator 3 , I've missed to add proper timeout 
-values by
-.Xr setsockopt 2 
-as exception handling on  
-.Xr accept 2 ,
-.Xr recvmsg 2 
-and 
-.Xr sendmsg 2 , when those are called for message passing between
-.Xr pam_unix 8 
-module and 
-.Xr sod 8 
-daemon.
+

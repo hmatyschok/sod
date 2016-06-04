@@ -49,6 +49,9 @@
 #define SOD_PID_FILE     "/var/run/sod.pid"
 #define SOD_SOCK_FILE     "/var/run/sod.sock"
 
+#define SOD_SNDTIMEO    360
+#define SOD_RCVTIMEO    360
+
 static pid_t     pid;
 static pthread_t     tid;
 
@@ -79,6 +82,7 @@ static void *    sod_sigaction(void *);
 int
 main(int argc, char **argv)
 {
+    struct timeval tv;
     int fd;
     
     if (getuid() != 0)
@@ -124,7 +128,7 @@ main(int argc, char **argv)
     if (atexit(sod_atexit) < 0)
         sod_errx(EX_OSERR, "Can't register sod_atexit");
 /* 
- * Modefy signal handling.
+ * Modefy signal handling and externalize.
  */
     if (sigfillset(&signalset) < 0)
         sod_errx(EX_OSERR, "Can't initialize signal set");
@@ -166,20 +170,26 @@ main(int argc, char **argv)
     
     if ((fd = socket(sun->sun_family, SOCK_STREAM, 0)) < 0) 
         sod_errx(EX_OSERR, "Can't create socket");
+/*
+ * Initialize timeout values.
+ */
+    tv.tv_sec = SOD_SNDTIMEO;
+    tv.tv_usec = 0;
+
+    if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0)
+        sod_errx(EX_OSERR, "setsockopt(SO_SNDTIMEO) %s", strerror(errno));
  
+    tv.tv_sec = SOD_RCVTIMEO;
+    tv.tv_usec = 0;
+    
+    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+        sod_errx(EX_OSERR, "setsockopt(SO_RCVTIMEO) %s", strerror(errno));
+    
     (void)unlink(sun->sun_path);
 
     if (bind(fd, (struct sockaddr *)sun, len) < 0)
         sod_errx(EX_OSERR, "Can't bind %s", sun->sun_path);    
-/*
- * XXX:
- * XXX: Missing exception hnadling focussed on 
- * XXX:
- * XXX:  SO_SNDTIMEO -set timeout value for output
- * XXX:  csshjsolidSO_RCVTIMEO - set timeout value for input
- * XXX:
- * XXX: service primitves.
- */
+        
     if (listen(fd, C_MSG_QLEN) < 0) 
         sod_errx(EX_OSERR, "Can't listen %s", sun->sun_path);
 /*
@@ -187,7 +197,7 @@ main(int argc, char **argv)
  */    
      if ((ca = c_authenticator_class_init()) == NULL)
          sod_errx(EX_OSERR, "Can't initialize c_authenticator");
- 
+
     for (;;) {
         struct c_thr *thr;
         int rmt;
@@ -196,7 +206,21 @@ main(int argc, char **argv)
  * pthread(3) embedded transaction.
  */
         if ((rmt = accept(fd, NULL, NULL)) < 0)
-            continue;
+            continue;        
+/*
+ * Initialize timeout values.
+ */
+        tv.tv_sec = SOD_SNDTIMEO;
+        tv.tv_usec = 0;
+
+        if (setsockopt(rmt, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0)
+            sod_errx(EX_OSERR, "setsockopt(SO_SNDTIMEO) %s", strerror(errno));
+ 
+        tv.tv_sec = SOD_RCVTIMEO;
+        tv.tv_usec = 0;
+    
+        if (setsockopt(rmt, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+            sod_errx(EX_OSERR, "setsockopt(SO_RCVTIMEO) %s", strerror(errno));
         
         if ((thr = (*ca->ca_create)(fd, rmt)) != NULL) {
             (void)(*ca->ca_join)(thr);
