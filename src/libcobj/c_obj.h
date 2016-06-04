@@ -68,7 +68,7 @@ typedef int     (*c_unlock_t)(void *);
 
 typedef int     (*c_sleep_t)(void *, void *);
 typedef int     (*c_wakeup_t)(void *, void *);
-typedef int     (*c_wait_t)(u_int, void *, void *);
+typedef int     (*c_wait_t)(time_t, void *, void *);
 
 typedef void     (*c_stop_t)(void *);
 typedef int     (*c_destroy_t)(void *, void *);
@@ -88,9 +88,9 @@ struct c_obj {
 #define C_INIT  0x00000001   
 #define C_BASE    0x00000010
 #define C_THR    0x00000020
-    TAILQ_ENTRY(c_obj) co_next;
+    LIST_ENTRY(c_obj) co_next;
 };
-TAILQ_HEAD(c_cache, c_obj);
+LIST_HEAD(c_cache, c_obj);
 
 /*
  * Implements generic interface. 

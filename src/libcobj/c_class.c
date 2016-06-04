@@ -73,7 +73,7 @@ static int  c_thr_lock(void *);
 static int  c_thr_unlock(void *);
 static int  c_thr_wakeup(void *, void *);
 static int  c_thr_sleep(void *, void *);
-static int  c_thr_wait(u_int, void *, void *);
+static int  c_thr_wait(time_t, void *, void *);
 static int     c_thr_destroy(void *, void *);
 
 static void *     c_nop_create(void *);
@@ -84,7 +84,7 @@ static int  c_nop_unlock(void *);
 
 static int  c_nop_sleep(void *, void *);
 static int  c_nop_wakeup(void *, void *);
-static int  c_nop_wait(u_int, void *, void *);
+static int  c_nop_wait(time_t, void *, void *);
 
 static void     c_nop_stop(void *);
 static int     c_nop_destroy(void *, void *);
@@ -248,7 +248,7 @@ c_cache_add(void *arg0, void *arg1)
     if ((ch = arg0) == NULL)
         return (NULL);
      
-    TAILQ_INSERT_TAIL(ch, co, co_next);    
+    LIST_INSERT_HEAD(ch, co, co_next);    
     
     return (co);
 }
@@ -268,7 +268,8 @@ c_cache_get(void *arg0, void *arg1)
     if ((ch = arg0) == NULL)
         return (NULL);   
  
-    TAILQ_FOREACH_SAFE(co, ch, co_next, co_tmp) {
+    LIST_FOREACH_SAFE(co, ch, co_next, co_tmp) {    
+        
         if (co->co_id == key->co_id) 
             break;
     } 
@@ -291,7 +292,7 @@ c_cache_del(void *arg0, void *arg1)
         return (NULL);
     
     if ((co = c_cache_get(ch, co)) != NULL)
-        TAILQ_REMOVE(ch, co, co_next);
+        LIST_REMOVE(co, co_next);
     
     return (co);
 }
@@ -308,12 +309,14 @@ c_children_free(struct c_class *cls)
     if (cls == NULL)
         return (-1);
 
-    while (!TAILQ_EMPTY(&cls->c_children)) {
-        co = TAILQ_FIRST(&cls->c_children);
+    while (!LIST_EMPTY(&cls->c_children)) {
+        co = LIST_FIRST(&cls->c_children);
         
         if (c_class_fini(cls, co))
             return (-1);
     }
+    LIST_INIT(&cls->c_children);
+    
     return (0);
 }
 
@@ -328,12 +331,14 @@ c_instances_free(struct c_class *cls)
     if (cls == NULL)
         return (-1);
 
-    while (!TAILQ_EMPTY(&cls->c_instances)) {
-        co = TAILQ_FIRST(&cls->c_instances);
+    while (!LIST_EMPTY(&cls->c_instances)) {
+        co = LIST_FIRST(&cls->c_instances);
         
         if ((*cls->c_destroy)(cls, co))
             return (-1);
     }
+    LIST_INIT(&cls->c_instances);
+    
     return (0);
 }
 
@@ -366,8 +371,8 @@ c_class_init(void *arg0, void *arg1)
 /*
  * XXX: This might be refactored as generic implementation.
  */
-        TAILQ_INIT(&cls->c_children);
-        TAILQ_INIT(&cls->c_instances);
+        LIST_INIT(&cls->c_children);
+        LIST_INIT(&cls->c_instances);
        
         if (cls != cls0) { 
 /*
@@ -630,12 +635,12 @@ syslog(LOG_DEBUG, "%s\n", __func__);
  * Fell asleep for ts seconds.
  */
 static int 
-c_thr_wait(u_int ts, void *cls0, void *arg)
+c_thr_wait(time_t ts, void *cls0, void *arg)
 {
     struct c_thr *thr;
     struct c_class *cls;
     
-    u_int uts;    
+    time_t uts;    
     
     struct timeval tv;
     struct timespec abstime;
@@ -787,7 +792,7 @@ c_nop_wakeup(void *cls0 __unused, void *arg __unused)
 }
 
 static int  
-c_nop_wait(u_int ts __unused, void *cls0 __unused, void *arg __unused)
+c_nop_wait(time_t ts __unused, void *cls0 __unused, void *arg __unused)
 {
 
     return (-1);

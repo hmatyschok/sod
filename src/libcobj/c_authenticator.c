@@ -257,27 +257,27 @@ syslog(LOG_DEBUG, "%s: rx: %s\n", __func__, sc->sc_buf.msg_tok);
 static void *
 c_authenticator_start(void *arg)
 {
-    ca_state_t fn;
     struct ca_softc *sc;
     struct c_class *this;
-    
-    fn = NULL;
+    ca_state_t fn;
     
     if ((sc = arg) == NULL)
         goto out;
     
     this = &c_authenticator_class;
     
-    if ((*this->c_sleep)
-        (this, sc) == 0)
+    if ((*this->c_sleep)(this, sc) == 0)
         fn = (ca_state_t)c_authenticator_establish;    
+    else 
+        fn = NULL;
+        
+    while (fn != NULL)
+        fn = (ca_state_t)(*fn)(sc);
 
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
-#endif /* C_OBJ_DEBUG */    
-    
-    while (fn != NULL)
-        fn = (ca_state_t)(*fn)(sc);
+#endif /* C_OBJ_DEBUG */ 
+
 out:    
     return (arg);
 }    
