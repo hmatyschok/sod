@@ -144,7 +144,7 @@ struct c_base {
 /*
  * Unnamed semaphore.
  */    
-    sem_t       *cb_sem;
+    sem_t       cb_sem;
     pid_t       cb_pid;
 };
 #define C_BASE_CLASS     1463676824

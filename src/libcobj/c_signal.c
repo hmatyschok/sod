@@ -125,7 +125,7 @@ c_signal_start(void *arg)
     
     if ((sc = arg) == NULL)
         goto out;
-            
+        
     for (;;) {
         if (sigwait(&sc->sc_sigset, &sig) != 0)
             errx(EX_OSERR, "Can't select signal set");
@@ -168,7 +168,7 @@ c_signal_create(void)
 {
     struct c_class *this;
     struct c_signal_softc *sc;
-    
+
     this = &c_signal_class;
     sc = (*this->c_create)(this);
     
@@ -180,7 +180,7 @@ c_signal_create(void)
     
     if (sigfillset(&sc->sc_sigset) < 0)
         goto bad1;
-    
+
     return (&sc->sc_thr);
 bad1:    
     (void)(*this->c_destroy)(this, sc);

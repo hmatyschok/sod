@@ -65,8 +65,8 @@ static void *   c_cache_del(void *, void *);
 static int    c_class_init(void *, void *);
 static int     c_class_fini(void *, void *);
 
-static int  c_base_lock(void *);
-static int  c_base_unlock(void *);
+static int  c_base_wakeup(void *, void *);
+static int  c_base_sleep(void *, void *);
 
 static void *     c_thr_create(void *);
 static int  c_thr_lock(void *);
@@ -117,8 +117,8 @@ static struct c_class c_nop_class = {
  */   
     .c_create         = c_nop_create,
     .c_start         = c_nop_start,
-    .c_lock         = c_base_lock,    
-    .c_unlock         = c_base_unlock,
+    .c_lock         = c_nop_lock,    
+    .c_unlock         = c_nop_unlock,
     .c_wakeup       = c_nop_wakeup,
     .c_sleep       = c_nop_sleep,
     .c_wait        = c_nop_wait,
@@ -148,10 +148,10 @@ static struct c_class c_base_class = {
  */  
     .c_create         = c_nop_create,
     .c_start         = c_nop_start,
-    .c_lock         = c_base_lock,    
-    .c_unlock         = c_base_unlock,
-    .c_wakeup       = c_nop_wakeup,
-    .c_sleep       = c_nop_sleep,
+    .c_lock         = c_nop_lock,    
+    .c_unlock         = c_nop_unlock,
+    .c_wakeup       = c_base_wakeup,
+    .c_sleep       = c_base_sleep,
     .c_wait        = c_nop_wait,
     .c_stop         = c_nop_stop,
     .c_destroy         = c_nop_destroy,
@@ -565,7 +565,7 @@ c_thr_lock(void *arg)
         return (-1);
 /*
  * Calling pthread(3) blocks, until mutual exclusion is available. 
- */   
+ */
     return (pthread_mutex_lock(&thr->ct_mtx));
 }
 
@@ -596,11 +596,7 @@ c_thr_sleep(void *cls0, void *arg)
         return (-1);
     
     cls = (cls0 == NULL) ? &c_thr_class : cls0;
- 
-#ifdef C_OBJ_DEBUG        
-syslog(LOG_DEBUG, "%s\n", __func__);
-#endif /* C_OBJ_DEBUG */ 
-    
+
     if ((*cls->c_lock)(thr))
         return (-1);
 
@@ -623,10 +619,6 @@ c_thr_wakeup(void *cls0, void *arg)
     
     if (pthread_cond_signal(&thr->ct_cv))
         return (-1); 
-        
-#ifdef C_OBJ_DEBUG        
-syslog(LOG_DEBUG, "%s\n", __func__);
-#endif /* C_OBJ_DEBUG */ 
 
     return ((*cls->c_unlock)(thr));
 }
@@ -701,10 +693,6 @@ c_thr_destroy(void *arg0, void *arg1)
     if ((thr = (*cls->c_obj_del)(&cls->c_instances, thr)) != NULL)
         free(thr);
 
-#ifdef C_OBJ_DEBUG        
-syslog(LOG_DEBUG, "%s\n", __func__);
-#endif /* C_OBJ_DEBUG */    
-
     return (0);
 }
 
@@ -715,35 +703,38 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 /*
  * XXX: incomplete...
  */
-
+ 
 /*
- * Lock instance.
+ * Fell asleep.
  */
 static int 
-c_base_lock(void *arg)
+c_base_sleep(void *cls0 __unused, void *arg)
 {
     struct c_base *base;
     
     if ((base = arg) == NULL) 
         return (-1);
 
-    return (sem_wait(base->cb_sem));
+    return (sem_wait(&base->cb_sem));
 }
 
 /*
- * Unlock instance.
- */
+ * Continue stalled pthread(3) execution.
+ */ 
 static int 
-c_base_unlock(void *arg)
+c_base_wakeup(void *cls0 __unused, void *arg)
 {
     struct c_base *base;
     
     if ((base = arg) == NULL) 
         return (-1);
-    
-    return (sem_post(base->cb_sem));
+/*
+ * XXX: This is wrong, because sem_post(3) 
+ * XXX: might be called during runtime of  
+ * XXX: signal handler.
+ */    
+    return (sem_post(&base->cb_sem));
 }
-
 
 /******************************************************************************
  * Protected methods, null-operations

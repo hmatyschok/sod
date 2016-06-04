@@ -270,16 +270,15 @@ c_authenticator_start(void *arg)
         fn = (ca_state_t)c_authenticator_establish;    
     else 
         fn = NULL;
-        
+     
     while (fn != NULL)
         fn = (ca_state_t)(*fn)(sc);
 
 #ifdef C_OBJ_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* C_OBJ_DEBUG */ 
-
 out:    
-    return (arg);
+    return (NULL);
 }    
  
 /*
