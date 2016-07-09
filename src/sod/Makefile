@@ -1,4 +1,4 @@
-# Copyright 2015 Henning Matyschok.
+# Copyright 2015, 2016 Henning Matyschok.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -23,14 +23,12 @@
 # SUCH DAMAGE.
 #
 #
-# version=0.2
+# version=0.3
 
 
 PROG=	sod
 SRCS=	sod.c
 MAN=    sod.8
-
-LDADD=	-lcobj -lthr
 
 .include <bsd.prog.mk>
 

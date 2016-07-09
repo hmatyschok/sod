@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * version=0.2
+ * version=0.3
  */
 
 #include <sys/stat.h>
@@ -32,31 +32,53 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+
 #include <sysexits.h>
 #include <syslog.h>
-#include <unistd.h>
 
-#include <c_obj.h>
-#include <c_authenticator.h>
+#include "sod.h"
 
 /*
  * Simple sign-on service on demand daemon - sod
  */
 
-#define SOD_WORK_DIR     "/"
-#define SOD_PID_FILE     "/var/run/sod.pid"
-#define SOD_SOCK_FILE     "/var/run/sod.sock"
+/*
+ * Recursively defined callback function. 
+ */
+typedef long     (*sod_state_fn_t)(void *);
+typedef sod_state_fn_t     (*sod_state_t)(void *);
 
-#define SOD_SNDTIMEO    360
-#define SOD_RCVTIMEO    360
+/*
+ * Component, proxyfies pam(8) based authentication service.
+ */
+
+struct sod_softc {
+    pid_t     sc_id;     /* binding, child */
+     
+    char sc_host[C_NMAX + 1];
+    char sc_user[C_NMAX + 1];
+    const char     *sc_prompt;
+    const char     *sc_pw_prompt;
+    
+    pam_handle_t     *sc_pamh;    
+    struct pam_conv     sc_pamc;     /* variable data */ 
+    struct passwd     *sc_pwd;
+    
+    struct sod_msg     sc_buf;     /* for transaction used buffer */
+
+    uint32_t     sc_sock_srv;     /* fd, socket, applicant */
+    uint32_t     sc_sock_rmt;     /* fd, socket, applicant */
+    uint32_t     sc_eval;     /* tracks rv of pam(3) method calls */        
+};
+
+#define    SOD_BACKOFF_DFLT     3
+#define    SOD_RETRIES_DFLT     10
+
+#define    SOD_PROMPT_DFLT        "login: "
+#define    SOD_PW_PROMPT_DFLT    "Password:"
 
 static pid_t     pid;
 static pthread_t     tid;
-
-static struct c_authenticator *ca;
-static struct c_signal *cs;
 
 static char *cmd; 
 
@@ -76,13 +98,20 @@ static void     sod_errx(int, const char *, ...);
 static void     sod_atexit(void);
 static void *    sod_sigaction(void *);
 
+static int     sod_conv(int, const struct pam_message **, 
+    struct pam_response **, void *);
+
+static sod_state_fn_t     sod_response(void *);
+static sod_state_fn_t     sod_authenticate(void *);
+static sod_state_fn_t     sod_establish(void *);
+static void     sod_doit(int, int);
+
 /*
  * Fork.
  */
 int
 main(int argc, char **argv)
 {
-    struct timeval tv;
     int fd;
     
     if (getuid() != 0)
@@ -170,20 +199,6 @@ main(int argc, char **argv)
     
     if ((fd = socket(sun->sun_family, SOCK_STREAM, 0)) < 0) 
         sod_errx(EX_OSERR, "Can't create socket");
-/*
- * Initialize timeout values.
- */
-    tv.tv_sec = SOD_SNDTIMEO;
-    tv.tv_usec = 0;
-
-    if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0)
-        sod_errx(EX_OSERR, "setsockopt(SO_SNDTIMEO) %s", strerror(errno));
- 
-    tv.tv_sec = SOD_RCVTIMEO;
-    tv.tv_usec = 0;
-    
-    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
-        sod_errx(EX_OSERR, "setsockopt(SO_RCVTIMEO) %s", strerror(errno));
     
     (void)unlink(sun->sun_path);
 
@@ -193,41 +208,320 @@ main(int argc, char **argv)
     if (listen(fd, C_MSG_QLEN) < 0) 
         sod_errx(EX_OSERR, "Can't listen %s", sun->sun_path);
 /*
- * Fetch interface from c_authenticator_class.
- */    
-     if ((ca = c_authenticator_class_init()) == NULL)
-         sod_errx(EX_OSERR, "Can't initialize c_authenticator");
-
-    for (;;) {
-        struct c_thr *thr;
-        int rmt;
-/*
- * Wait until accept(2) and perform by 
- * pthread(3) embedded transaction.
+ * Wait until accept(2) and perform transaction.
  */
+    for (;;) {
+        int rmt;
+
         if ((rmt = accept(fd, NULL, NULL)) < 0)
             continue;        
-/*
- * Initialize timeout values.
- */
-        tv.tv_sec = SOD_SNDTIMEO;
-        tv.tv_usec = 0;
 
-        if (setsockopt(rmt, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0)
-            sod_errx(EX_OSERR, "setsockopt(SO_SNDTIMEO) %s", strerror(errno));
- 
-        tv.tv_sec = SOD_RCVTIMEO;
-        tv.tv_usec = 0;
-    
-        if (setsockopt(rmt, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
-            sod_errx(EX_OSERR, "setsockopt(SO_RCVTIMEO) %s", strerror(errno));
+        if (fork() == 0) 
+            sod_doit(fd, rmt);
         
-        if ((thr = (*ca->ca_create)(fd, rmt)) != NULL) {
-            (void)(*ca->ca_join)(thr);
-            (void)(*ca->ca_destroy)(thr);    
-        }
+       (void)close(rmt);
     }
             /* NOT REACHED */    
+}
+
+/*
+ * Life-cycle of pam(8) transaction performed by child.
+ */
+static void     
+sod_doit(int s, int r)
+{
+    struct sod_softc sc;
+    sod_state_t fn;
+    
+    (void)memset(&sc, 0, sizeof(sc));
+    
+    sc.sc_sock_rmt = r;
+    sc.sc_sock_srv = s;
+    sc.sc_pamc.appdata_ptr = &sc;
+    sc.sc_pamc.conv = sod_conv;
+    
+    fn = (sod_state_t)sod_establish;
+    
+    while (fn != NULL)
+        fn = (sod_state_t)(*fn)(&sc);
+
+    if (sc.sc_pamh != NULL)
+        (void)pam_end(sc.sc_pamh, sc.sc_eval);
+
+    (void)memset(&sc, 0, sizeof(sc));
+
+#ifdef SOD_DEBUG        
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* SOD_DEBUG */ 
+
+    exit(0);
+}
+
+/*
+ * Inital state, rx request and state transition.
+ */
+static sod_state_fn_t 
+sod_establish(void *arg)
+{
+    sod_state_fn_t state = NULL;
+    struct sod_softc *sc;
+
+    if ((sc = arg) == NULL)
+        goto out;
+        
+#ifdef SOD_DEBUG        
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* SOD_DEBUG */    
+    
+    if (sod_msg_fn(sod_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0) 
+        goto out;
+
+    if (sc->sc_buf.msg_id != C_MSG)
+        goto out;
+/*
+ * State transition, if any.
+ */
+    if (sc->sc_buf.msg_code == sod_AUTH_REQ) 
+        state = (sod_state_fn_t)sod_authenticate;
+    
+    if (state == NULL)
+        goto out;
+/*
+ * Create < hostname, user > tuple.
+ */
+    if (gethostname(sc->sc_host, SOD_NMAX) == 0) 
+        (void)strncpy(sc->sc_user, sc->sc_buf.msg_tok, SOD_NMAX);
+    else
+        state = NULL;
+out:    
+    return (state);
+}
+
+/*
+ * Initialize pam(8) transaction and authenticate.
+ */
+static sod_state_fn_t  
+sod_authenticate(void *arg)
+{    
+    sod_state_fn_t state;
+    login_cap_t *lc;
+    struct sod_softc *sc;
+    int retries, backoff;
+    int ask = 0, cnt = 0;
+    uint32_t resp;
+
+    state = NULL;
+    lc = NULL;
+    
+    if ((sc = arg) == NULL)
+        goto out;
+
+#ifdef SOD_DEBUG        
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* SOD_DEBUG */    
+    
+/*
+ * Parts of in login.c defined codesections are reused here.
+ */    
+    lc = login_getclass(NULL);
+    sc->sc_prompt = login_getcapstr(lc, "login_prompt", 
+        ca_prompt_default, ca_prompt_default);
+    sc->sc_pw_prompt = login_getcapstr(lc, "passwd_prompt", 
+        ca_pw_prompt_default, ca_pw_prompt_default);
+    retries = login_getcapnum(lc, "login-retries", 
+        sod_RETRIES_DFLT, sod_RETRIES_DFLT);
+    backoff = login_getcapnum(lc, "login-backoff", 
+        sod_BACKOFF_DFLT, sod_BACKOFF_DFLT);
+    login_close(lc);
+    lc = NULL;
+/*
+ * Verify, if username exists in passwd database. 
+ */
+    if ((sc->sc_pwd = getpwnam(sc->sc_user)) != NULL) {
+/*
+ * Verify, if user has UID 0, because login by UID 0 is not allowed. 
+ */
+        if (sc->sc_pwd->pw_uid == (uid_t)0) 
+            sc->sc_eval = PAM_PERM_DENIED;
+        else
+            sc->sc_eval = PAM_SUCCESS;
+    } else 
+        sc->sc_eval = PAM_USER_UNKNOWN;
+    
+    endpwent();
+    
+    if (sc->sc_eval == PAM_SUCCESS)
+        ask = 1;
+    
+    while (ask != 0) {
+/*
+ * Service name for pam(8) is defined implecitely.
+ */        
+        sc->sc_eval = pam_start(__func__, sc->sc_user, 
+            &sc->sc_pamc, &sc->sc_pamh);
+
+        if (sc->sc_eval == PAM_SUCCESS) {
+            sc->sc_eval = pam_set_item(sc->sc_pamh, PAM_RUSER, 
+                sc->sc_user);
+        }
+    
+        if (sc->sc_eval == PAM_SUCCESS) {
+            sc->sc_eval = pam_set_item(sc->sc_pamh, PAM_RHOST, 
+                sc->sc_host);
+        }
+    
+        if (sc->sc_eval == PAM_SUCCESS) {
+            sc->sc_eval = pam_authenticate(sc->sc_pamh, 0);
+/*
+ * Authenticate.
+ */
+            if (sc->sc_eval == PAM_AUTH_ERR) {                
+/*
+ * Reenter loop, if PAM_AUTH_ERR condition halts. 
+ */
+                cnt += 1;    
+        
+                if (cnt > backoff) 
+                    (void)sleep((u_int)((cnt - backoff) * 5));
+        
+                if (cnt >= retries)
+                    ask = 0;        
+    
+                (void)pam_end(sc->sc_pamh, sc->sc_eval);
+        
+                sc->sc_pamh = NULL;
+            } else
+                ask = 0;    
+        } else
+            ask = 0;    
+    }
+/*
+ * Create response.
+ */            
+    resp = sod_AUTH_REJ;    
+    
+    if (sc->sc_eval == PAM_SUCCESS) 
+        resp = sod_AUTH_ACK;
+            
+    sod_msg_prepare(sc->sc_user, resp, sc->sc_id, &sc->sc_buf);
+    
+    state = (sod_state_fn_t)sod_response;
+out:    
+    return (state);
+}
+
+/*
+ * Send response.
+ */
+static sod_state_fn_t  
+sod_response(void *arg)
+{    
+    sod_state_fn_t state = NULL;
+    struct sod_softc *sc;
+
+    if ((sc = arg) == NULL)
+        goto out;
+        
+#ifdef SOD_DEBUG        
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* SOD_DEBUG */
+
+    (void)sod_msg_fn(sod_msg_send, sc->sc_sock_rmt, &sc->sc_buf);
+out:    
+    return (state);
+}
+
+/*
+ * By pam_vpromt(3) called conversation routine.
+ * This event takes place during runtime of by
+ * pam_authenticate(3) called pam_get_authtok(3).
+ */
+static int 
+sod_conv(int num_msg, const struct pam_message **msg, 
+        struct pam_response **resp, void *data) 
+{
+    struct sod_softc *sc = NULL;
+    int pam_err = PAM_AUTH_ERR;
+    int p = 1, q, i, style, j;
+    struct pam_response *tok;
+    
+    if ((sc = data) == NULL)
+        p -= 2;
+
+    if ((q = num_msg) == p) {
+        if ((tok = calloc(q, sizeof(*tok))) == NULL)
+            q = 0;
+    } else 
+        q = 0;
+        
+    for (i = 0; i < q; ++i) {
+        style = msg[i]->msg_style;
+    
+        switch (style) {
+        case PAM_PROMPT_ECHO_OFF:
+        case PAM_PROMPT_ECHO_ON:
+        case PAM_ERROR_MSG:
+        case PAM_TEXT_INFO:
+            break;
+        default:
+            style = -1;
+            break;
+        }    
+        
+        if (style < 0)
+            break; 
+                    
+        sod_msg_prepare(msg[i]->msg, sod_AUTH_NAK, 
+            sc->sc_id, &sc->sc_buf);
+/*
+ * Request PAM_AUTHTOK.
+ */                
+        if (sod_msg_fn(sod_msg_send, sc->sc_sock_rmt, &sc->sc_buf) < 0)
+            break;
+/*
+ * Await response from applicant.
+ */    
+        if (sod_msg_fn(sod_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0)
+            break;
+    
+        if (sc->sc_buf.msg_id != sc->sc_id)    
+            break;    
+            
+        if (sc->sc_buf.msg_code != sod_AUTH_REQ)
+            break;
+    
+        if ((tok[i].resp = calloc(1, SOD_NMAX + 1)) == NULL) 
+            break;
+            
+#ifdef SOD_DEBUG
+syslog(LOG_DEBUG, "%s: rx: %s\n", __func__, sc->sc_buf.msg_tok);    
+#endif /* SOD_DEBUG */    
+                
+        (void)strncpy(tok[i].resp, sc->sc_buf.msg_tok, SOD_NMAX);
+        (void)memset(&sc->sc_buf, 0, sizeof(sc->sc_buf));
+      }
+    
+    if (i < q) {
+/*
+ * Cleanup, if something went wrong.
+ */
+        for (j = i, i = 0; i < j; ++i) { 
+            (void)memset(tok[i].resp, 0, SOD_NMAX);
+            free(tok[i].resp);
+            tok[i].resp = NULL;
+        }
+        (void)memset(tok, 0, q * sizeof(*tok));
+        free(tok);
+        tok = NULL;
+    } else {
+/*
+ * Self explanatory.
+ */        
+        if (i > 0 && p > 0) 
+            pam_err = PAM_SUCCESS;    
+    }    
+    *resp = tok;
+    return (pam_err);
 }
 
 /*
