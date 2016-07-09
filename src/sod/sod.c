@@ -24,22 +24,25 @@
  *
  * version=0.3
  */
-
+ 
 #include <sys/stat.h>
 
-#include <errno.h>
+#include <security/pam_appl.h>
+
+#include <fcntl.h>
+#include <login_cap.h>
+#include <pthread.h>
+#include <pwd.h>
 #include <signal.h>
 #include <stdarg.h>
-#include <stddef.h>
 #include <stdio.h>
-
 #include <sysexits.h>
 #include <syslog.h>
 
 #include "sod.h"
 
 /*
- * Simple sign-on service on demand daemon - sod
+ * Simple sign-on service on demand daemon - sod(8).
  */
 
 /*
@@ -55,8 +58,8 @@ typedef sod_state_fn_t     (*sod_state_t)(void *);
 struct sod_softc {
     pid_t     sc_id;     /* binding, child */
      
-    char sc_host[C_NMAX + 1];
-    char sc_user[C_NMAX + 1];
+    char sc_host[SOD_NMAX + 1];
+    char sc_user[SOD_NMAX + 1];
     const char     *sc_prompt;
     const char     *sc_pw_prompt;
     
@@ -93,6 +96,9 @@ static struct sockaddr_un *sun;
 static size_t len;
 
 static sigset_t signalset;
+
+static char     *sod_prompt_default = SOD_PROMPT_DFLT;
+static char     *sod_pw_prompt_default = SOD_PW_PROMPT_DFLT;
 
 static void     sod_errx(int, const char *, ...);
 static void     sod_atexit(void);
@@ -205,7 +211,7 @@ main(int argc, char **argv)
     if (bind(fd, (struct sockaddr *)sun, len) < 0)
         sod_errx(EX_OSERR, "Can't bind %s", sun->sun_path);    
         
-    if (listen(fd, C_MSG_QLEN) < 0) 
+    if (listen(fd, SOD_MSG_QLEN) < 0) 
         sod_errx(EX_OSERR, "Can't listen %s", sun->sun_path);
 /*
  * Wait until accept(2) and perform transaction.
@@ -328,13 +334,13 @@ syslog(LOG_DEBUG, "%s\n", __func__);
  */    
     lc = login_getclass(NULL);
     sc->sc_prompt = login_getcapstr(lc, "login_prompt", 
-        ca_prompt_default, ca_prompt_default);
+        sod_prompt_default, sod_prompt_default);
     sc->sc_pw_prompt = login_getcapstr(lc, "passwd_prompt", 
-        ca_pw_prompt_default, ca_pw_prompt_default);
+        sod_pw_prompt_default, sod_pw_prompt_default);
     retries = login_getcapnum(lc, "login-retries", 
-        sod_RETRIES_DFLT, sod_RETRIES_DFLT);
+        SOD_RETRIES_DFLT, SOD_RETRIES_DFLT);
     backoff = login_getcapnum(lc, "login-backoff", 
-        sod_BACKOFF_DFLT, sod_BACKOFF_DFLT);
+        SOD_BACKOFF_DFLT, SOD_BACKOFF_DFLT);
     login_close(lc);
     lc = NULL;
 /*
@@ -573,10 +579,6 @@ sod_errx(int eval, const char *fmt, ...)
 static void 
 sod_atexit(void)
 {
-    if (ca != NULL) 
-        (void)c_authenticator_class_fini(); {
-        (void)c_thr_class_fini(NULL);
-    }
     (void)unlink(sock_file);
     (void)unlink(pid_file);
     

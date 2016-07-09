@@ -30,6 +30,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +40,8 @@
 #define SOD_WORK_DIR     "/"
 #define SOD_PID_FILE     "/var/run/sod.pid"
 #define SOD_SOCK_FILE     "/var/run/sod.sock"
+
+#define SOD_NMAX     127
 
 struct sod_msg {
     pid_t     sm_id;     /* identifier */
@@ -54,8 +57,6 @@ struct sod_msg {
 #define SOD_MSG_ACK     0x00000010
 #define SOD_MSG_NAK     0x00000020
 #define SOD_MSG_REJ     0x00000030
-
-#define SOD_NMAX     127
 
 typedef ssize_t     (*sod_msg_fn_t)(int, struct msghdr *, int);
 
@@ -85,7 +86,7 @@ sod_msg_alloc(void)
     struct sod_msg *sm;
     
     if ((sm = calloc(1, SOD_MSG_LEN)) != NULL) {
-        sm->sm_id = SOD_MSG;
+        sm->sm_id = getpid();
         sm->sm_len = SOD_MSG_LEN;
     }
     return (sm);
