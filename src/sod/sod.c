@@ -64,6 +64,8 @@ typedef sod_state_fn_t     (*sod_state_t)(void *);
 struct sod_softc {
     pid_t     sc_id;     /* binding, child */
      
+    login_cap_t *sc_lc;
+     
     char sc_host[SOD_NMAX + 1];
     char sc_user[SOD_NMAX + 1];
     const char     *sc_prompt;
@@ -287,59 +289,26 @@ syslog(LOG_DEBUG, "%s\n", __func__);
     if (sc->sc_buf.sm_id == sc->sc_id)
         goto out;
 /*
- * State transition, if any.
- */
-    if (sc->sc_buf.sm_code == SOD_AUTH_REQ) 
-        state = (sod_state_fn_t)sod_authenticate;
-    
-    if (state == NULL)
-        goto out;
-/*
  * Create < hostname, user > tuple.
  */
-    if (gethostname(sc->sc_host, SOD_NMAX) == 0) 
-        (void)strncpy(sc->sc_user, sc->sc_buf.sm_tok, SOD_NMAX);
-    else
-        state = NULL;
-out:    
-    return (state);
-}
-
-/*
- * Initialize pam(8) transaction and authenticate.
- */
-static sod_state_fn_t  
-sod_authenticate(void *arg)
-{    
-    login_cap_t *lc;
-    struct sod_softc *sc;
-    int retries, backoff;
-    int ask = 0, cnt = 0;
-    uint32_t resp;
-
-    lc = NULL;
-    
-    if ((sc = arg) == NULL)
-        goto out;
-
-#ifdef SOD_DEBUG        
-syslog(LOG_DEBUG, "%s\n", __func__);
-#endif /* SOD_DEBUG */    
-    
+    if (gethostname(sc->sc_host, SOD_NMAX) < 0) 
+        goto out;    
+ 
+    (void)strncpy(sc->sc_user, sc->sc_buf.sm_tok, SOD_NMAX);
 /*
  * Parts of in login.c defined codesections are reused here.
  */    
-    lc = login_getclass(NULL);
-    sc->sc_prompt = login_getcapstr(lc, "login_prompt", 
+    sc->sc_lc = login_getclass(NULL);
+    sc->sc_prompt = login_getcapstr(sc->sc_lc, "login_prompt", 
         sod_prompt_default, sod_prompt_default);
-    sc->sc_pw_prompt = login_getcapstr(lc, "passwd_prompt", 
+    sc->sc_pw_prompt = login_getcapstr(sc->sc_lc, "passwd_prompt", 
         sod_pw_prompt_default, sod_pw_prompt_default);
-    retries = login_getcapnum(lc, "login-retries", 
+    retries = login_getcapnum(sc->sc_lc, "login-retries", 
         SOD_RETRIES_DFLT, SOD_RETRIES_DFLT);
-    backoff = login_getcapnum(lc, "login-backoff", 
+    backoff = login_getcapnum(sc->sc_lc, "login-backoff", 
         SOD_BACKOFF_DFLT, SOD_BACKOFF_DFLT);
-    login_close(lc);
-    lc = NULL;
+    login_close(sc->sc_lc);
+    sc->sc_lc = NULL;
 /*
  * Verify, if username exists in passwd database. 
  */
@@ -354,14 +323,41 @@ syslog(LOG_DEBUG, "%s\n", __func__);
     } else 
         sc->sc_eval = PAM_USER_UNKNOWN;
     
-    endpwent();
+    endpwent();          
+/*
+ * State transition, if any.
+ */
+    if (sc->sc_buf.sm_code == SOD_AUTH_REQ) 
+        state = (sod_state_fn_t)sod_authenticate;
+out:    
+    return (state);
+}
+
+/*
+ * Initialize pam(8) transaction and authenticate.
+ */
+static sod_state_fn_t  
+sod_authenticate(void *arg)
+{    
     
+    struct sod_softc *sc;
+    int retries, backoff;
+    int ask = 0, cnt = 0;
+    uint32_t resp;
+
+    if ((sc = arg) == NULL)
+        goto out;
+
+#ifdef SOD_DEBUG        
+syslog(LOG_DEBUG, "%s\n", __func__);
+#endif /* SOD_DEBUG */    
+        
     if (sc->sc_eval == PAM_SUCCESS)
         ask = 1;
     
     while (ask != 0) {
 /*
- * Service name for pam(8) is defined implecitely.
+ * Open pam(8) session and authenticate.
  */        
         sc->sc_eval = pam_start(__func__, sc->sc_user, 
             &sc->sc_pamc, &sc->sc_pamh);

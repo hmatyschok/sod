@@ -16,17 +16,34 @@ Further, communication between backend and pam(8) is provided by using socket
 API. Transactions are mapped in AF_UNIX domain. See by unix(4) denoted manual 
 page for further details.
 
- -> https://www.freebsd.org/cgi/man.cgi?query=unix&manpath=FreeBSD+10.3-stable
+ | https://www.freebsd.org/cgi/man.cgi?query=unix&manpath=FreeBSD+10.3-stable
 
 This provides a strict isolation between the domain of given backend 
 and pam(8) subsystem. 
 
- -> https://www.freebsd.org/cgi/man.cgi?query=pam&manpath=FreeBSD+10.3-stable
+ | https://www.freebsd.org/cgi/man.cgi?query=pam&manpath=FreeBSD+10.3-stable
 
 Now, it is up to the pam(8) subsystem to handle (or forward) service requests 
 targeting local user data base (not recommondated, but possible - self 
-explanatory) or to remote sites managing user credentials.
+explanatory) or to remote sites managing user credentials. 
 
-Further, the present implementation is far from completeness and correctness.
+The present implementation is far from completeness and correctness.
 
+Why was not libevent(3) chosed as proxy pattern performing asynchronous I/O 
+on non-blocking unix(4) domain socket?
+
+ | Because to avoid dependencies on  
+ | external libraries for holding the 
+ | implementation of this daemon as  
+ | simpleas possible.
+
+Why was not used select(2)? 
+
+ | Because select(2) scales terribly on
+ | large amounts by socket(2) allocated
+ | file descriptors.
+
+Why was not not used kqueue(2)?
+
+ | Because of portability.
 
