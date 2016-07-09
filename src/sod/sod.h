@@ -48,7 +48,6 @@ struct sod_msg {
     int     sm_code;     /* encodes request or response */
     char     sm_tok[SOD_NMAX + 1];
 };
-#define SOD_MSG     1463677004
 #define SOD_MSG_LEN     (sizeof(struct sod_msg))
 #define SOD_MSG_QLEN     13
 
@@ -70,7 +69,7 @@ typedef ssize_t     (*sod_msg_fn_t)(int, struct msghdr *, int);
 #define SOD_TERM_REJ     (SOD_TERM_REQ|SOD_MSG_REJ)
 
 static __inline struct sod_msg *     sod_msg_alloc(void);
-static __inline void     sod_msg_prepare(const char *, uint32_t, long, 
+static __inline void     sod_msg_prepare(const char *, uint32_t, pid_t, 
     struct sod_msg *);
 static __inline ssize_t     sod_msg_send(int, struct msghdr *, int);
 static __inline ssize_t     sod_msg_recv(int, struct msghdr *, int);
@@ -96,7 +95,7 @@ sod_msg_alloc(void)
  * Fills message buffer with attributes, if any.
  */
 static __inline void 
-sod_msg_prepare(const char *s, uint32_t code, long id, struct sod_msg *sm)
+sod_msg_prepare(const char *s, uint32_t code, pid_t id, struct sod_msg *sm)
 {
     if (sm != NULL) {
         (void)memset(sm, 0, sizeof(*sm));
