@@ -404,10 +404,10 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 /*
  * Create response.
  */            
-    resp = SOD_AUTH_REJ;    
-    
     if (sc->sc_eval == PAM_SUCCESS) 
         resp = SOD_AUTH_ACK;
+    else 
+        resp = SOD_AUTH_REJ; 
             
     sod_msg_prepare(sc->sc_user, resp, sc->sc_id, &sc->sc_buf);
     
