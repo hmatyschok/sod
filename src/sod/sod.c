@@ -44,6 +44,12 @@
 /*
  * Simple sign-on service on demand daemon - sod(8).
  */
+ 
+#define    SOD_BACKOFF_DFLT     3
+#define    SOD_RETRIES_DFLT     10
+
+#define    SOD_PROMPT_DFLT        "login: "
+#define    SOD_PW_PROMPT_DFLT    "Password:"
 
 /*
  * Recursively defined callback function. 
@@ -73,12 +79,6 @@ struct sod_softc {
     uint32_t     sc_sock_rmt;     /* fd, socket, applicant */
     uint32_t     sc_eval;     /* tracks rv of pam(3) method calls */        
 };
-
-#define    SOD_BACKOFF_DFLT     3
-#define    SOD_RETRIES_DFLT     10
-
-#define    SOD_PROMPT_DFLT        "login: "
-#define    SOD_PW_PROMPT_DFLT    "Password:"
 
 static pid_t     pid;
 static pthread_t     tid;
