@@ -107,7 +107,6 @@ static void *    sod_sigaction(void *);
 static int     sod_conv(int, const struct pam_message **, 
     struct pam_response **, void *);
 
-static sod_state_fn_t     sod_response(void *);
 static sod_state_fn_t     sod_authenticate(void *);
 static sod_state_fn_t     sod_establish(void *);
 static void     sod_doit(int, int);
@@ -312,14 +311,12 @@ out:
 static sod_state_fn_t  
 sod_authenticate(void *arg)
 {    
-    sod_state_fn_t state;
     login_cap_t *lc;
     struct sod_softc *sc;
     int retries, backoff;
     int ask = 0, cnt = 0;
     uint32_t resp;
 
-    state = NULL;
     lc = NULL;
     
     if ((sc = arg) == NULL)
@@ -414,30 +411,9 @@ syslog(LOG_DEBUG, "%s\n", __func__);
             
     sod_msg_prepare(sc->sc_user, resp, sc->sc_id, &sc->sc_buf);
     
-    state = (sod_state_fn_t)sod_response;
-out:    
-    return (state);
-}
-
-/*
- * Send response.
- */
-static sod_state_fn_t  
-sod_response(void *arg)
-{    
-    sod_state_fn_t state = NULL;
-    struct sod_softc *sc;
-
-    if ((sc = arg) == NULL)
-        goto out;
-        
-#ifdef SOD_DEBUG        
-syslog(LOG_DEBUG, "%s\n", __func__);
-#endif /* SOD_DEBUG */
-
     (void)sod_msg_fn(sod_msg_send, sc->sc_sock_rmt, &sc->sc_buf);
 out:    
-    return (state);
+    return (NULL);
 }
 
 /*
