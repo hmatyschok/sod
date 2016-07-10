@@ -18,6 +18,17 @@ page for further details.
 
  | https://www.freebsd.org/cgi/man.cgi?query=unix&manpath=FreeBSD+10.3-stable
 
+This provides a strict isolation between the domain of given backend 
+and pam(8) subsystem. 
+
+ | https://www.freebsd.org/cgi/man.cgi?query=pam&manpath=FreeBSD+10.3-stable
+
+Now, it is up to the pam(8) subsystem to handle (or forward) service requests 
+targeting local user data base (not recommondated, but possible - self 
+explanatory) or to remote sites managing user credentials. 
+
+ | The present implementation is far from completeness and correctness.
+
 Why was not libevent(3) chosed as proxy pattern performing 
 asynchronous I/O on non-blocking unix(4) domain socket?
 
@@ -35,16 +46,4 @@ Why was not used select(2)?
 Why was not used kqueue(2)?
 
  | Because of portability.
-
-This provides a strict isolation between the domain of given backend 
-and pam(8) subsystem. 
-
- | https://www.freebsd.org/cgi/man.cgi?query=pam&manpath=FreeBSD+10.3-stable
-
-Now, it is up to the pam(8) subsystem to handle (or forward) service requests 
-targeting local user data base (not recommondated, but possible - self 
-explanatory) or to remote sites managing user credentials. 
-
-The present implementation is far from completeness and correctness.
-
 
