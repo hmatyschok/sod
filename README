@@ -24,13 +24,11 @@ Now, it is up to the pam(8) subsystem to handle (or forward) service
 requests targeting local user data base or remote sites managing user 
 credentials. 
 
-Why was not libevent(3) chosed as proxy pattern performing asynchronous 
-I/O on non-blocking unix(4) domain socket?
+Why was not libevent(3) used as proxy pattern performing 
+asynchronous I/O on non-blocking unix(4) domain socket?
 
  | Because to avoid dependencies on  
- | external libraries for holding the 
- | implementation of this daemon as  
- | simpleas possible.
+ | external libraries.
 
 Why was not used select(2) for aynchronous I/O? 
 
@@ -41,4 +39,15 @@ Why was not used select(2) for aynchronous I/O?
 Why was not used kqueue(2)?
 
  | Because of portability.
+
+Why is this a forking daemon using blocking streaming socket?
+
+ | To hold the implementation as simple 
+ | as possible.   
+ |
+ | Therefore, any child process maps to 
+ | an uniqe Process Control Block which 
+ | provides or describes an insulated 
+ | context on asynchronous I/O events. 
+ 
 
