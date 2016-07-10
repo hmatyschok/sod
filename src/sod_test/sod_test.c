@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * version=0.2
+ * version=0.3
  */
 
 #include <err.h>
@@ -35,24 +35,21 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include <c_obj.h>
-#include <c_authenticator.h>
+#include <sod.h>
 
 /*
  * Simple test.
  */
- 
-#define SOD_SOCK_FILE     "/var/run/sod.sock"
 
 struct sod_test_args {
-    char     sta_user[C_NMAX + 1];
-    char     sta_pw[C_NMAX + 1];
+    char     sta_user[SOD_NMAX + 1];
+    char     sta_pw[SOD_NMAX + 1];
 };
 
 static int     max_arg = 3;
 static char     *sock_file = SOD_SOCK_FILE;
 
-static char     cmd[C_NMAX + 1];
+static char     cmd[SOD_NMAX + 1];
 
 static struct sockaddr_storage     sap;
 static struct sockaddr_un *sun;
@@ -67,9 +64,8 @@ void *
 sod_test(void *arg)
 {
     struct sod_test_args *sta;
-    struct c_msg *buf;
+    struct sod_msg *buf;
     int s, state;
-    long id;
     char *tok;
     
     if ((sta = arg) == NULL)
@@ -83,11 +79,10 @@ sod_test(void *arg)
     if (connect(s, (struct sockaddr *)sun, len) < 0)
         goto bad1;
         
-    if ((buf = c_msg_alloc()) == NULL)
+    if ((buf = sod_msg_alloc()) == NULL)
         goto bad2;
     
-    state = C_AUTHENTICATOR_AUTH_REQ;
-    id = buf->msg_id;    
+    state = SOD_AUTH_REQ;
     tok = sta->sta_user;
     
     while (state) {
@@ -95,70 +90,57 @@ sod_test(void *arg)
  * Select action.
  */
         switch (state) {    
-        case C_AUTHENTICATOR_AUTH_REQ:
+        case SOD_AUTH_REQ:
 /*
  * Create message.
  */ 
-            c_msg_prepare(tok, state, id, buf);
+            sod_msg_prepare(tok, state, buf);
 /*
  * Send message.
  */         
-            if (c_msg_fn(c_msg_send, s, buf) < 0) {
+            if (sod_msg_fn(sod_msg_send, s, buf) < 0) {
                 syslog(LOG_DEBUG, 
                     "Can't send PAM_USER as request\n");
                 state = 0;
                 break;
             }
             syslog(LOG_DEBUG, 
-                "tx: C_AUTHENTICATOR_AUTH_REQ: %s\n", 
-                buf->msg_tok);        
+                "tx: SOD_AUTH_REQ: %s\n", 
+                buf->sm_tok);        
 /*
  * Await response.
  */            
-            if (c_msg_fn(c_msg_recv, s, buf) < 0) {
+            if (sod_msg_fn(sod_msg_recv, s, buf) < 0) {
                 syslog(LOG_DEBUG, 
                     "Can't receive "
-                    "C_AUTHENTICATOR_AUTH_NAK "
+                    "SOD_AUTH_NAK "
                     "as response");
-                state = 0;
-                break;
-            }
-            
-            if (tok == sta->sta_user) {
-/*
- * Cache for conversation need credentials.
- */
-                id = buf->msg_id;
-            } 
-                
-            if (buf->msg_id != id) {
-                syslog(LOG_DEBUG, "Invalid tid received");
                 state = 0;
                 break;
             }
 /*
  * Determine state transition.
  */
-            state = buf->msg_code;
+            state = buf->sm_code;
             break;
-        case C_AUTHENTICATOR_AUTH_NAK:
+        case SOD_AUTH_NAK:
             syslog(LOG_DEBUG, 
-                "rx: C_AUTHENTICATOR_AUTH_NAK: %s", 
-                buf->msg_tok);
+                "rx: SOD_AUTH_NAK: %s", 
+                buf->sm_tok);
 /*
  * Select for response need data.
  */        
-            state = C_AUTHENTICATOR_AUTH_REQ; 
+            state = SOD_AUTH_REQ; 
             tok = sta->sta_pw;    
             break;
-        case C_AUTHENTICATOR_AUTH_ACK:
+        case SOD_AUTH_ACK:
             syslog(LOG_DEBUG, 
-                "rx: C_AUTHENTICATOR_AUTH_ACK: PAM_SUCCESS\n");
+                "rx: SOD_AUTH_ACK: PAM_SUCCESS\n");
             state = 0;
             break;
-        case C_AUTHENTICATOR_AUTH_REJ:
+        case SOD_AUTH_REJ:
             syslog(LOG_DEBUG, 
-                "rx: C_AUTHENTICATOR_AUTH_REJ: PAM_AUTH_ERR\n");
+                "rx: SOD_AUTH_REJ: PAM_AUTH_ERR\n");
             state = 0;
             break;
         default:
@@ -167,7 +149,7 @@ sod_test(void *arg)
         }
     }
 bad2:
-    c_msg_free(buf);
+    sod_msg_free(buf);
 bad1:
     (void)close(s);
 bad:
@@ -191,7 +173,7 @@ main(int argc, char **argv)
     if (sigaction(SIGCHLD, &sa, NULL) < 0)
         errx(EX_OSERR, "Can't disable SIGCHLD");
 
-    (void)strncpy(cmd, argv[0], C_NMAX);
+    (void)strncpy(cmd, argv[0], SOD_NMAX);
         
     if (argc != max_arg)
         errx(EX_USAGE, "\nusage: %s user pw\n", argv[0]);
@@ -199,8 +181,8 @@ main(int argc, char **argv)
  * Cache arguments and prepare buffer.
  */        
     (void)memset(&sta, 0, sizeof(sta));
-    (void)strncpy(sta.sta_user, argv[1], C_NMAX);
-    (void)strncpy(sta.sta_pw, argv[2], C_NMAX);    
+    (void)strncpy(sta.sta_user, argv[1], SOD_NMAX);
+    (void)strncpy(sta.sta_pw, argv[2], SOD_NMAX);    
     (void)memset(&sap, 0, sizeof(sap));
 /*
  * Create socket address.

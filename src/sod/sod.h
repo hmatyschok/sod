@@ -44,7 +44,6 @@
 #define SOD_NMAX     127
 
 struct sod_msg {
-    pid_t     sm_id;     /* identifier */
     ssize_t     sm_len;
 #define msg_id     msg_obj.co_id
 #define msg_len     msg_obj.co_len
@@ -70,7 +69,7 @@ typedef ssize_t     (*sod_msg_fn_t)(int, struct msghdr *, int);
 #define SOD_TERM_REJ     (SOD_TERM_REQ|SOD_MSG_REJ)
 
 static __inline struct sod_msg *     sod_msg_alloc(void);
-static __inline void     sod_msg_prepare(const char *, uint32_t, pid_t, 
+static __inline void     sod_msg_prepare(const char *, uint32_t, 
     struct sod_msg *);
 static __inline ssize_t     sod_msg_send(int, struct msghdr *, int);
 static __inline ssize_t     sod_msg_recv(int, struct msghdr *, int);
@@ -85,10 +84,9 @@ sod_msg_alloc(void)
 {
     struct sod_msg *sm;
     
-    if ((sm = calloc(1, SOD_MSG_LEN)) != NULL) {
-        sm->sm_id = getpid();
+    if ((sm = calloc(1, SOD_MSG_LEN)) != NULL) 
         sm->sm_len = SOD_MSG_LEN;
-    }
+           
     return (sm);
 }
 
@@ -96,12 +94,11 @@ sod_msg_alloc(void)
  * Fills message buffer with attributes, if any.
  */
 static __inline void 
-sod_msg_prepare(const char *s, uint32_t code, pid_t id, struct sod_msg *sm)
+sod_msg_prepare(const char *s, uint32_t code, struct sod_msg *sm)
 {
     if (sm != NULL) {
         (void)memset(sm, 0, sizeof(*sm));
     
-        sm->sm_id = id;
         sm->sm_code = code;
     
         if (s != NULL) 

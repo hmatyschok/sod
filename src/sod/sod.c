@@ -62,8 +62,6 @@ typedef sod_state_fn_t     (*sod_state_t)(void *);
  */
 
 struct sod_softc {
-    pid_t     sc_id;     /* binding, child */
-     
     login_cap_t *sc_lc;
      
     char sc_host[SOD_NMAX + 1];
@@ -242,8 +240,6 @@ sod_doit(int s, int r)
     
     (void)memset(&sc, 0, sizeof(sc));
     
-    sc.sc_id = getpid();
-    
     sc.sc_sock_rmt = r;
     sc.sc_sock_srv = s;
     
@@ -286,8 +282,7 @@ syslog(LOG_DEBUG, "%s\n", __func__);
     if (sod_msg_fn(sod_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0) 
         goto out;
 
-    if (sc->sc_buf.sm_id == sc->sc_id)
-        goto out;
+    sc->sc_id = sc->sc_buf.sm_id;
 /*
  * Create < hostname, user > tuple.
  */
@@ -338,8 +333,7 @@ out:
  */
 static sod_state_fn_t  
 sod_authenticate(void *arg)
-{    
-    
+{      
     struct sod_softc *sc;
     int retries, backoff;
     int ask = 0, cnt = 0;
@@ -405,7 +399,7 @@ syslog(LOG_DEBUG, "%s\n", __func__);
     else 
         resp = SOD_AUTH_REJ; 
             
-    sod_msg_prepare(sc->sc_user, resp, sc->sc_id, &sc->sc_buf);
+    sod_msg_prepare(sc->sc_user, resp, &sc->sc_buf);
     
     (void)sod_msg_fn(sod_msg_send, sc->sc_sock_rmt, &sc->sc_buf);
 out:    
@@ -452,8 +446,7 @@ sod_conv(int num_msg, const struct pam_message **msg,
         if (style < 0)
             break; 
                     
-        sod_msg_prepare(msg[i]->msg, SOD_AUTH_NAK, 
-            sc->sc_id, &sc->sc_buf);
+        sod_msg_prepare(msg[i]->msg, SOD_AUTH_NAK, &sc->sc_buf);
 /*
  * Request PAM_AUTHTOK.
  */                
@@ -463,10 +456,7 @@ sod_conv(int num_msg, const struct pam_message **msg,
  * Await response from applicant.
  */    
         if (sod_msg_fn(sod_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0)
-            break;
-    
-        if (sc->sc_buf.sm_id != sc->sc_id)    
-            break;    
+            break; 
             
         if (sc->sc_buf.sm_code != SOD_AUTH_REQ)
             break;
