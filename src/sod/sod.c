@@ -298,12 +298,13 @@ sod_doit(int s, int r)
                 sc.sc_eval = pam_set_item(pamh, PAM_RHOST, 
                     sc.sc_host);
             }
-    
+           
             if (sc.sc_eval == PAM_SUCCESS) {
-                sc.sc_eval = pam_authenticate(pamh, 0);
 /*
  * Authenticate.
- */
+ */                
+                sc.sc_eval = pam_authenticate(pamh, 0);
+                
                 if (sc.sc_eval == PAM_AUTH_ERR) {                
 /*
  * Reenter loop, if PAM_AUTH_ERR condition halts. 
