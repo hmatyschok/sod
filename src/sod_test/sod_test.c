@@ -71,7 +71,7 @@ sod_test(void *arg)
     if ((sta = arg) == NULL)
         goto bad;
 /*
- * Connect with sod instance.
+ * Connect with sod(8) instance.
  */    
     if ((s = socket(sun->sun_family, SOCK_STREAM, 0)) < 0) 
         goto bad;

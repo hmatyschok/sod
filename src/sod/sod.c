@@ -46,22 +46,18 @@
  */
 
 struct sod_softc {
-    login_cap_t *sc_lc;
-     
     char sc_host[SOD_NMAX + 1];
     char sc_user[SOD_NMAX + 1];
-    const char     *sc_prompt;
-    const char     *sc_pw_prompt;
-    
-    pam_handle_t     *sc_pamh;    
-    struct pam_conv     sc_pamc;     /* variable data */ 
-    struct passwd     *sc_pwd;
-    
+
     struct sod_msg     sc_buf;     /* for transaction used buffer */
 
-    uint32_t     sc_sock_srv;     /* fd, socket, applicant */
-    uint32_t     sc_sock_rmt;     /* fd, socket, applicant */
-    uint32_t     sc_eval;     /* tracks rv of pam(3) method calls */        
+    pam_handle_t     *sc_pamh;    
+    struct pam_conv     sc_pamc;     /* variable data */ 
+    struct passwd     *sc_pwd;   
+    
+    int     sc_sock_srv;     /* fd, socket, applicant */
+    int     sc_sock_rmt;     /* fd, socket, applicant */
+    int     sc_eval;     /* tracks rv of pam(3) method calls */ 
 };
 #define    SOD_BACKOFF_DFLT     3
 #define    SOD_RETRIES_DFLT     10
@@ -219,7 +215,7 @@ main(int argc, char **argv)
         if (fork() == 0) 
             sod_doit(fd, rmt);
         
-       (void)close(rmt);
+        (void)close(rmt);
     }
             /* NOT REACHED */    
 }
@@ -255,7 +251,7 @@ sod_doit(int s, int r)
 syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* SOD_DEBUG */ 
 
-    exit(0);
+    exit(EX_OK);
 }
 
 /*
@@ -279,20 +275,6 @@ syslog(LOG_DEBUG, "%s\n", __func__);
         goto out;    
  
     (void)strncpy(sc->sc_user, sc->sc_buf.sm_tok, SOD_NMAX);
-/*
- * Parts of in login.c defined codesections are reused here.
- */    
-    sc->sc_lc = login_getclass(NULL);
-    sc->sc_prompt = login_getcapstr(sc->sc_lc, "login_prompt", 
-        sod_prompt_default, sod_prompt_default);
-    sc->sc_pw_prompt = login_getcapstr(sc->sc_lc, "passwd_prompt", 
-        sod_pw_prompt_default, sod_pw_prompt_default);
-    retries = login_getcapnum(sc->sc_lc, "login-retries", 
-        SOD_RETRIES_DFLT, SOD_RETRIES_DFLT);
-    backoff = login_getcapnum(sc->sc_lc, "login-backoff", 
-        SOD_BACKOFF_DFLT, SOD_BACKOFF_DFLT);
-    login_close(sc->sc_lc);
-    sc->sc_lc = NULL;
 /*
  * Verify, if username exists in passwd database. 
  */
@@ -325,7 +307,11 @@ out:
 static sod_state_fn_t  
 sod_authenticate(struct sod_softc *sc)
 {      
-    struct sod_softc *sc;
+    login_cap_t *sc_lc;
+    
+    const char     *prompt;
+    const char     *pw_prompt;
+    
     int retries, backoff;
     int ask = 1, cnt = 0;
     uint32_t resp;
@@ -333,7 +319,22 @@ sod_authenticate(struct sod_softc *sc)
 #ifdef SOD_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* SOD_DEBUG */
-    
+
+/*
+ * Parts of in login.c defined codesections are reused here.
+ */    
+    lc = login_getclass(NULL);
+    prompt = login_getcapstr(lc, "login_prompt", 
+        sod_prompt_default, sod_prompt_default);
+    pw_prompt = login_getcapstr(lc, "passwd_prompt", 
+        sod_pw_prompt_default, sod_pw_prompt_default);
+    retries = login_getcapnum(lc, "login-retries", 
+        SOD_RETRIES_DFLT, SOD_RETRIES_DFLT);
+    backoff = login_getcapnum(lc, "login-backoff", 
+        SOD_BACKOFF_DFLT, SOD_BACKOFF_DFLT);
+    login_close(lc);
+    lc = NULL;
+       
     while (ask != 0) {
 /*
  * Open pam(8) session and authenticate.
