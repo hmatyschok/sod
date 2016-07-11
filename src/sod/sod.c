@@ -50,10 +50,6 @@ struct sod_softc {
     char sc_user[SOD_NMAX + 1];
 
     struct sod_msg     sc_buf;     /* for transaction used buffer */
-
-    pam_handle_t     *sc_pamh;    
-    struct pam_conv     sc_pamc;     /* variable data */ 
-    struct passwd     *sc_pwd;   
     
     int     sc_sock_srv;     /* fd, socket, applicant */
     int     sc_sock_rmt;     /* fd, socket, applicant */
@@ -220,11 +216,15 @@ static void
 sod_doit(int s, int r)
 {
     struct sod_softc sc;
+    struct pam_conv     sc_pamc;     /* variable data */ 
+    struct passwd     *sc_pwd;   
     
     login_cap_t *sc_lc;
-    
+   
     const char     *prompt;
     const char     *pw_prompt;
+    
+    pam_handle_t     *sc_pamh;
     
     int retries, backoff;
     int ask = 1, cnt = 0;
@@ -235,8 +235,8 @@ sod_doit(int s, int r)
     sc.sc_sock_rmt = r;
     sc.sc_sock_srv = s;
     
-    sc.sc_pamc.appdata_ptr = &sc;
-    sc.sc_pamc.conv = sod_conv;
+    pamc.appdata_ptr = &sc;
+    pamc.conv = sod_conv;
 /*
  * Create < hostname, user > tuple.
  */
@@ -287,20 +287,20 @@ sod_doit(int s, int r)
  * Open pam(8) session and authenticate.
  */        
             sc.sc_eval = pam_start(sod_name, sc.sc_user, 
-                &sc.sc_pamc, &sc.sc_pamh);
+                &pamc, &pamh);
 
             if (sc.sc_eval == PAM_SUCCESS) {
-                sc.sc_eval = pam_set_item(sc.sc_pamh, PAM_RUSER, 
+                sc.sc_eval = pam_set_item(pamh, PAM_RUSER, 
                     sc.sc_user);
             }
     
             if (sc.sc_eval == PAM_SUCCESS) {
-                sc.sc_eval = pam_set_item(sc.sc_pamh, PAM_RHOST, 
+                sc.sc_eval = pam_set_item(pamh, PAM_RHOST, 
                     sc.sc_host);
             }
     
             if (sc.sc_eval == PAM_SUCCESS) {
-                sc.sc_eval = pam_authenticate(sc.sc_pamh, 0);
+                sc.sc_eval = pam_authenticate(pamh, 0);
 /*
  * Authenticate.
  */
@@ -316,9 +316,9 @@ sod_doit(int s, int r)
                     if (cnt >= retries)
                         ask = 0;        
     
-                    (void)pam_end(sc.sc_pamh, sc.sc_eval);
+                    (void)pam_end(pamh, sc.sc_eval);
         
-                    sc.sc_pamh = NULL;
+                    pamh = NULL;
                 } else
                     ask = 0;    
             } else
@@ -328,8 +328,8 @@ sod_doit(int s, int r)
 /*
  * Close pam(8) session, if any.
  */
-    if (sc.sc_pamh != NULL)
-        (void)pam_end(sc.sc_pamh, sc.sc_eval);  
+    if (pamh != NULL)
+        (void)pam_end(pamh, sc.sc_eval);  
 out:
 /*
  * Create response.
@@ -350,41 +350,6 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 #endif /* SOD_DEBUG */ 
 
     exit(EX_OK);
-}
-
-/*
- * Inital state, rx request and state transition.
- */
-static sod_state_fn_t 
-sod_establish(struct sod_softc *sc)
-{
-    sod_state_fn_t state = NULL;
-        
-#ifdef SOD_DEBUG        
-syslog(LOG_DEBUG, "%s\n", __func__);
-#endif /* SOD_DEBUG */    
-    
-
-out:    
-    return (state);
-}
-
-/*
- * Initialize pam(8) transaction and authenticate.
- */
-static sod_state_fn_t  
-sod_authenticate(struct sod_softc *sc)
-{      
-    
-
-#ifdef SOD_DEBUG        
-syslog(LOG_DEBUG, "%s\n", __func__);
-#endif /* SOD_DEBUG */
-
-
-
-out:    
-    return (NULL);
 }
 
 /*
