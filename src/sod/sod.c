@@ -44,22 +44,6 @@
 /*
  * Simple sign-on service on demand daemon - sod(8).
  */
- 
-#define    SOD_BACKOFF_DFLT     3
-#define    SOD_RETRIES_DFLT     10
-
-#define    SOD_PROMPT_DFLT        "login: "
-#define    SOD_PW_PROMPT_DFLT    "Password:"
-
-/*
- * Recursively defined callback function. 
- */
-typedef long     (*sod_state_fn_t)(void *);
-typedef sod_state_fn_t     (*sod_state_t)(void *);
-
-/*
- * Component, proxyfies pam(8) based authentication service.
- */
 
 struct sod_softc {
     login_cap_t *sc_lc;
@@ -79,11 +63,22 @@ struct sod_softc {
     uint32_t     sc_sock_rmt;     /* fd, socket, applicant */
     uint32_t     sc_eval;     /* tracks rv of pam(3) method calls */        
 };
+#define    SOD_BACKOFF_DFLT     3
+#define    SOD_RETRIES_DFLT     10
+
+#define    SOD_PROMPT_DFLT        "login: "
+#define    SOD_PW_PROMPT_DFLT    "Password:"
+
+/*
+ * Recursively defined callback function. 
+ */
+typedef long     (*sod_state_fn_t)(struct sod_softc *);
+typedef sod_state_fn_t     (*sod_state_t)(struct sod_softc *);
 
 static pid_t     pid;
 static pthread_t     tid;
 
-static char *cmd; 
+static char *sod_name; 
 
 static char *work_dir = SOD_WORK_DIR;
 static char *pid_file = SOD_PID_FILE;
@@ -107,8 +102,8 @@ static void *    sod_sigaction(void *);
 static int     sod_conv(int, const struct pam_message **, 
     struct pam_response **, void *);
 
-static sod_state_fn_t     sod_authenticate(void *);
-static sod_state_fn_t     sod_establish(void *);
+static sod_state_fn_t     sod_authenticate(struct sod_softc *);
+static sod_state_fn_t     sod_establish(struct sod_softc *);
 static void     sod_doit(int, int);
 
 /*
@@ -125,9 +120,9 @@ main(int argc, char **argv)
     if ((fd = open(pid_file, O_RDWR, 0640)) > -1) 
         sod_errx(EX_OSERR, "Daemon already running");    
         
-    cmd = argv[0];
+    sod_name = argv[0];
     
-    openlog(cmd, LOG_CONS, LOG_DAEMON);
+    openlog(sod_name, LOG_CONS, LOG_DAEMON);
 /*
  * Disable hang-up signal.
  */
@@ -267,13 +262,9 @@ syslog(LOG_DEBUG, "%s\n", __func__);
  * Inital state, rx request and state transition.
  */
 static sod_state_fn_t 
-sod_establish(void *arg)
+sod_establish(struct sod_softc *sc)
 {
     sod_state_fn_t state = NULL;
-    struct sod_softc *sc;
-
-    if ((sc = arg) == NULL)
-        goto out;
         
 #ifdef SOD_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
@@ -281,8 +272,6 @@ syslog(LOG_DEBUG, "%s\n", __func__);
     
     if (sod_msg_fn(sod_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0) 
         goto out;
-
-    sc->sc_id = sc->sc_buf.sm_id;
 /*
  * Create < hostname, user > tuple.
  */
@@ -322,8 +311,10 @@ syslog(LOG_DEBUG, "%s\n", __func__);
 /*
  * State transition, if any.
  */
-    if (sc->sc_buf.sm_code == SOD_AUTH_REQ) 
-        state = (sod_state_fn_t)sod_authenticate;
+    if (sc->sc_eval == PAM_SUCCESS) {
+        if (sc->sc_buf.sm_code == SOD_AUTH_REQ) 
+            state = (sod_state_fn_t)sod_authenticate;
+    }
 out:    
     return (state);
 }
@@ -332,28 +323,22 @@ out:
  * Initialize pam(8) transaction and authenticate.
  */
 static sod_state_fn_t  
-sod_authenticate(void *arg)
+sod_authenticate(struct sod_softc *sc)
 {      
     struct sod_softc *sc;
     int retries, backoff;
-    int ask = 0, cnt = 0;
+    int ask = 1, cnt = 0;
     uint32_t resp;
-
-    if ((sc = arg) == NULL)
-        goto out;
 
 #ifdef SOD_DEBUG        
 syslog(LOG_DEBUG, "%s\n", __func__);
-#endif /* SOD_DEBUG */    
-        
-    if (sc->sc_eval == PAM_SUCCESS)
-        ask = 1;
+#endif /* SOD_DEBUG */
     
     while (ask != 0) {
 /*
  * Open pam(8) session and authenticate.
  */        
-        sc->sc_eval = pam_start(__func__, sc->sc_user, 
+        sc->sc_eval = pam_start(sod_name, sc->sc_user, 
             &sc->sc_pamc, &sc->sc_pamh);
 
         if (sc->sc_eval == PAM_SUCCESS) {
@@ -470,7 +455,7 @@ syslog(LOG_DEBUG, "%s: rx: %s\n", __func__, sc->sc_buf.sm_tok);
                 
         (void)strncpy(tok[i].resp, sc->sc_buf.sm_tok, SOD_NMAX);
         (void)memset(&sc->sc_buf, 0, sizeof(sc->sc_buf));
-      }
+    }
     
     if (i < q) {
 /*
