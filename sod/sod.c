@@ -119,7 +119,7 @@ main(int argc, char **argv)
         sod_errx(EX_OSERR, "Can't fork");
     
     if (pid != 0) 
-        exit(0);
+        exit(EX_OK);
 /*
  * Daemonize.
  */  
@@ -199,7 +199,7 @@ main(int argc, char **argv)
 
         if (fork() == 0) 
             sod_doit(rmt);
-        
+                  
         (void)close(rmt);
     }
             /* NOT REACHED */    
@@ -257,11 +257,20 @@ sod_doit(int r)
             pam_err = PAM_PERM_DENIED;
         else
             pam_err = PAM_SUCCESS;
-
-        if (sc.sc_buf.sm_code == SOD_AUTH_REQ) {  
+    } else 
+        pam_err = PAM_USER_UNKNOWN;
+    
+    endpwent(); 
+    
+    resp = SOD_AUTH_REJ;
+    
+    if (pam_err == PAM_SUCCESS) {
 /*
  * Parts of in login.c defined codesections are reused here.
- */
+ */   
+        switch (sc.sc_buf.sm_code) {
+        case SOD_AUTH_REQ:  
+      
             lc = login_getclass(NULL);
             prompt = login_getcapstr(lc, "login_prompt", 
                 sod_prompt_default, sod_prompt_default);
@@ -286,6 +295,9 @@ sod_doit(int r)
     
                 if (pam_err == PAM_SUCCESS) 
                     pam_err = pam_set_item(pamh, PAM_RHOST, host);
+
+                if (pam_err == PAM_SUCCESS) 
+                    pam_err = pam_set_item(pamh, PAM_TTY, sod_sock_file); 
 
                 if (pam_err == PAM_SUCCESS) {
 /*
@@ -313,29 +325,51 @@ sod_doit(int r)
                 } else
                     ask = 0;    
             }
-        }    
+
+            if (pam_err == PAM_SUCCESS) 
+                pam_err = pam_open_session(pamh, 0);
+/*
+ * Create response.
+ */             
+            if (pam_err == PAM_SUCCESS) 
+                resp = SOD_AUTH_ACK;
         
-    } else 
-        pam_err = PAM_USER_UNKNOWN;
+        case SOD_TERM_REQ:    
+            pam_err = pam_start(sod_cmd, user, &pamc, &pamh);
+
+            if (pam_err == PAM_SUCCESS) 
+                pam_err = pam_set_item(pamh, PAM_RUSER, user);
     
-    endpwent();          
+            if (pam_err == PAM_SUCCESS) 
+                pam_err = pam_set_item(pamh, PAM_RHOST, host);
+
+            if (pam_err == PAM_SUCCESS) 
+                pam_err = pam_set_item(pamh, PAM_TTY, sod_sock_file); 
+
+            if (pam_err == PAM_SUCCESS) 
+                pam_err = pam_close_session(pamh, 0);
+/*
+ * Create response.
+ */             
+            if (pam_err == PAM_SUCCESS) 
+                resp = SOD_TERM_ACK;
+                  
+            break;
+        default:
+            break;
+        }    
+    }          
 /*
  * Close pam(8) session, if any.
  */
     if (pamh != NULL)
         (void)pam_end(pamh, pam_err);  
-/*
- * Create response.
- */             
-    if (pam_err == PAM_SUCCESS) 
-        resp = SOD_AUTH_ACK;
-    else 
-        resp = SOD_AUTH_REJ; 
-            
+
+    
     sod_msg_prepare(user, resp, &sc.sc_buf);
     
     (void)sod_msg_fn(sod_msg_send, sc.sc_rmt, &sc.sc_buf);
-    
+
     (void)memset(&sc, 0, sizeof(sc));
 
 #ifdef SOD_DEBUG        
