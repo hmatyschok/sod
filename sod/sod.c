@@ -46,10 +46,9 @@
  */
 
 struct sod_softc {
+    int     sc_srv;     /* fd, socket, applicant */
     struct sod_msg     sc_buf;     /* for transaction used buffer */
     
-    int     sc_srv;     /* fd, socket, applicant */
-    int     sc_rmt;     /* fd, socket, applicant */
     
     int     sc_eval;     /* tracks rv of pam(3) method calls */ 
 };
@@ -229,7 +228,7 @@ sod_doit(int r)
     
     int retries, backoff;
     int ask = 1, cnt = 0;
-    uint32_t resp;
+    int pam_err, resp;
 
     (void)memset(&sc, 0, sizeof(sc));
     
@@ -255,9 +254,9 @@ sod_doit(int r)
  * Verify, if user has UID 0, because login by UID 0 is not allowed. 
  */
         if (pwd->pw_uid == (uid_t)0) 
-            sc.sc_eval = PAM_PERM_DENIED;
+            pam_err = PAM_PERM_DENIED;
         else
-            sc.sc_eval = PAM_SUCCESS;
+            pam_err = PAM_SUCCESS;
 
         if (sc.sc_buf.sm_code == SOD_AUTH_REQ) {  
 /*
@@ -279,24 +278,22 @@ sod_doit(int r)
 /*
  * Open pam(8) session and authenticate.
  */        
-                sc.sc_eval = pam_start(sod_cmd, user, 
+                pam_err = pam_start(sod_cmd, user, 
                     &pamc, &pamh);
 
-                if (sc.sc_eval == PAM_SUCCESS) {
-                    sc.sc_eval = pam_set_item(pamh, PAM_RUSER, user);
-                }
+                if (pam_err == PAM_SUCCESS) 
+                    pam_err = pam_set_item(pamh, PAM_RUSER, user);
     
-                if (sc.sc_eval == PAM_SUCCESS) {
-                    sc.sc_eval = pam_set_item(pamh, PAM_RHOST, host);
-                }   
-           
-                if (sc.sc_eval == PAM_SUCCESS) {
+                if (pam_err == PAM_SUCCESS) 
+                    pam_err = pam_set_item(pamh, PAM_RHOST, host);
+
+                if (pam_err == PAM_SUCCESS) {
 /*
  * Authenticate.
  */                
-                    sc.sc_eval = pam_authenticate(pamh, 0);
+                    pam_err = pam_authenticate(pamh, 0);
                 
-                    if (sc.sc_eval == PAM_AUTH_ERR) {                
+                    if (pam_err == PAM_AUTH_ERR) {                
 /*
  * Reenter loop, if PAM_AUTH_ERR condition halts. 
  */
@@ -308,7 +305,7 @@ sod_doit(int r)
                         if (cnt >= retries)
                             ask = 0;        
     
-                        (void)pam_end(pamh, sc.sc_eval);
+                        (void)pam_end(pamh, pam_err);
         
                         pamh = NULL;
                     } else
@@ -319,18 +316,18 @@ sod_doit(int r)
         }    
         
     } else 
-        sc.sc_eval = PAM_USER_UNKNOWN;
+        pam_err = PAM_USER_UNKNOWN;
     
     endpwent();          
 /*
  * Close pam(8) session, if any.
  */
     if (pamh != NULL)
-        (void)pam_end(pamh, sc.sc_eval);  
+        (void)pam_end(pamh, pam_err);  
 /*
  * Create response.
  */             
-    if (sc.sc_eval == PAM_SUCCESS) 
+    if (pam_err == PAM_SUCCESS) 
         resp = SOD_AUTH_ACK;
     else 
         resp = SOD_AUTH_REJ; 
