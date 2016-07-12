@@ -242,10 +242,10 @@ sod_doit(int s, int r)
  * Create < hostname, user > tuple.
  */
     if (sod_msg_fn(sod_msg_recv, sc.sc_rmt, &sc.sc_buf) < 0) 
-        goto out;
+        exit(EX_OSERR);
 
     if (gethostname(host, SOD_NMAX) < 0) 
-        goto out;    
+        exit(EX_NOHOST); 
  
     (void)strncpy(user, sc.sc_buf.sm_tok, SOD_NMAX);
 /*
@@ -259,81 +259,78 @@ sod_doit(int s, int r)
             sc.sc_eval = PAM_PERM_DENIED;
         else
             sc.sc_eval = PAM_SUCCESS;
+
+        if (sc.sc_buf.sm_code == SOD_AUTH_REQ) {  
+/*
+ * Parts of in login.c defined codesections are reused here.
+ */
+            lc = login_getclass(NULL);
+            prompt = login_getcapstr(lc, "login_prompt", 
+                sod_prompt_default, sod_prompt_default);
+            pw_prompt = login_getcapstr(lc, "passwd_prompt", 
+                sod_pw_prompt_default, sod_pw_prompt_default);
+            retries = login_getcapnum(lc, "login-retries", 
+                SOD_RETRIES_DFLT, SOD_RETRIES_DFLT);
+            backoff = login_getcapnum(lc, "login-backoff", 
+                SOD_BACKOFF_DFLT, SOD_BACKOFF_DFLT);
+            login_close(lc);
+            lc = NULL;
+       
+            while (ask != 0) {
+/*
+ * Open pam(8) session and authenticate.
+ */        
+                sc.sc_eval = pam_start(sod_cmd, user, 
+                    &pamc, &pamh);
+
+                if (sc.sc_eval == PAM_SUCCESS) {
+                    sc.sc_eval = pam_set_item(pamh, PAM_RUSER, user);
+                }
+    
+                if (sc.sc_eval == PAM_SUCCESS) {
+                    sc.sc_eval = pam_set_item(pamh, PAM_RHOST, host);
+                }   
+           
+                if (sc.sc_eval == PAM_SUCCESS) {
+/*
+ * Authenticate.
+ */                
+                    sc.sc_eval = pam_authenticate(pamh, 0);
+                
+                    if (sc.sc_eval == PAM_AUTH_ERR) {                
+/*
+ * Reenter loop, if PAM_AUTH_ERR condition halts. 
+ */
+                        cnt += 1;    
+        
+                        if (cnt > backoff) 
+                            (void)sleep((u_int)((cnt - backoff) * 5));
+        
+                        if (cnt >= retries)
+                            ask = 0;        
+    
+                        (void)pam_end(pamh, sc.sc_eval);
+        
+                        pamh = NULL;
+                    } else
+                        ask = 0;    
+                } else
+                    ask = 0;    
+            }
+        }    
+        
     } else 
         sc.sc_eval = PAM_USER_UNKNOWN;
     
     endpwent();          
-
-    if (sc.sc_eval != PAM_SUCCESS)
-        goto out;
-        
-    if (sc.sc_buf.sm_code == SOD_AUTH_REQ) {  
-/*
- * Parts of in login.c defined codesections are reused here.
- */    
-        lc = login_getclass(NULL);
-        prompt = login_getcapstr(lc, "login_prompt", 
-            sod_prompt_default, sod_prompt_default);
-        pw_prompt = login_getcapstr(lc, "passwd_prompt", 
-            sod_pw_prompt_default, sod_pw_prompt_default);
-        retries = login_getcapnum(lc, "login-retries", 
-            SOD_RETRIES_DFLT, SOD_RETRIES_DFLT);
-        backoff = login_getcapnum(lc, "login-backoff", 
-            SOD_BACKOFF_DFLT, SOD_BACKOFF_DFLT);
-        login_close(lc);
-        lc = NULL;
-       
-        while (ask != 0) {
-/*
- * Open pam(8) session and authenticate.
- */        
-            sc.sc_eval = pam_start(sod_cmd, user, 
-                &pamc, &pamh);
-
-            if (sc.sc_eval == PAM_SUCCESS) {
-                sc.sc_eval = pam_set_item(pamh, PAM_RUSER, user);
-            }
-    
-            if (sc.sc_eval == PAM_SUCCESS) {
-                sc.sc_eval = pam_set_item(pamh, PAM_RHOST, host);
-            }
-           
-            if (sc.sc_eval == PAM_SUCCESS) {
-/*
- * Authenticate.
- */                
-                sc.sc_eval = pam_authenticate(pamh, 0);
-                
-                if (sc.sc_eval == PAM_AUTH_ERR) {                
-/*
- * Reenter loop, if PAM_AUTH_ERR condition halts. 
- */
-                    cnt += 1;    
-        
-                    if (cnt > backoff) 
-                        (void)sleep((u_int)((cnt - backoff) * 5));
-        
-                    if (cnt >= retries)
-                        ask = 0;        
-    
-                    (void)pam_end(pamh, sc.sc_eval);
-        
-                    pamh = NULL;
-                } else
-                    ask = 0;    
-            } else
-                ask = 0;    
-        }
-    }
 /*
  * Close pam(8) session, if any.
  */
     if (pamh != NULL)
         (void)pam_end(pamh, sc.sc_eval);  
-out:
 /*
  * Create response.
- */            
+ */             
     if (sc.sc_eval == PAM_SUCCESS) 
         resp = SOD_AUTH_ACK;
     else 
@@ -482,7 +479,7 @@ sod_errx(int eval, const char *fmt, ...)
 }
 
 /*
- * byr atextit(3) registered cleanup handler. 
+ * Close logfile on process termination. 
  */
 static void 
 sod_atexit(void)
