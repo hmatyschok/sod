@@ -86,7 +86,7 @@ static void *    sod_sigaction(void *);
 static int     sod_conv(int, const struct pam_message **, 
     struct pam_response **, void *);
 
-static void     sod_doit(int, int);
+static void     sod_doit(int);
 
 /*
  * Fork.
@@ -199,7 +199,7 @@ main(int argc, char **argv)
             continue;        
 
         if (fork() == 0) 
-            sod_doit(fd, rmt);
+            sod_doit(rmt);
         
         (void)close(rmt);
     }
@@ -210,7 +210,7 @@ main(int argc, char **argv)
  * By child performed pam(8) transaction.
  */
 static void     
-sod_doit(int s, int r)
+sod_doit(int r)
 {
     struct sod_softc sc;
     
@@ -234,7 +234,6 @@ sod_doit(int s, int r)
     (void)memset(&sc, 0, sizeof(sc));
     
     sc.sc_rmt = r;
-    sc.sc_srv = s;
     
     pamc.appdata_ptr = &sc;
     pamc.conv = sod_conv;
