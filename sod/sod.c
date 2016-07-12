@@ -487,8 +487,6 @@ sod_errx(int eval, const char *fmt, ...)
 static void 
 sod_atexit(void)
 {
-    (void)unlink(sod_sock_file);
-    (void)unlink(sod_pid_file);
-    
+
     closelog();
 }
