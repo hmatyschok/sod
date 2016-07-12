@@ -85,7 +85,7 @@ sod_msg_alloc(void)
     
     if ((sm = calloc(1, SOD_MSG_LEN)) != NULL) 
         sm->sm_len = SOD_MSG_LEN;
-           
+
     return (sm);
 }
 

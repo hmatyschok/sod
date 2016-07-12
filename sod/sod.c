@@ -46,13 +46,10 @@
  */
 
 struct sod_softc {
-    char sc_host[SOD_NMAX + 1];
-    char sc_user[SOD_NMAX + 1];
-
     struct sod_msg     sc_buf;     /* for transaction used buffer */
     
-    int     sc_sock_srv;     /* fd, socket, applicant */
-    int     sc_sock_rmt;     /* fd, socket, applicant */
+    int     sc_srv;     /* fd, socket, applicant */
+    int     sc_rmt;     /* fd, socket, applicant */
     
     int     sc_eval;     /* tracks rv of pam(3) method calls */ 
 };
@@ -65,11 +62,11 @@ struct sod_softc {
 static pid_t     pid;
 static pthread_t     tid;
 
-static char *sod_name; 
+static char *sod_cmd; 
 
-static char *work_dir = SOD_WORK_DIR;
-static char *pid_file = SOD_PID_FILE;
-static char *sock_file = SOD_SOCK_FILE;
+static char *sod_work_dir = SOD_WORK_DIR;
+static char *sod_pid_file = SOD_PID_FILE;
+static char *sod_sock_file = SOD_SOCK_FILE;
 
 static char     lock_file[PATH_MAX + 1];
 
@@ -102,12 +99,12 @@ main(int argc, char **argv)
     if (getuid() != 0)
         sod_errx(EX_NOPERM, "%s", strerror(EPERM));     
     
-    if ((fd = open(pid_file, O_RDWR, 0640)) > -1) 
+    if ((fd = open(sod_pid_file, O_RDWR, 0640)) > -1) 
         sod_errx(EX_OSERR, "Daemon already running");    
         
-    sod_name = argv[0];
+    sod_cmd = argv[0];
     
-    openlog(sod_name, LOG_CONS, LOG_DAEMON);
+    openlog(sod_cmd, LOG_CONS, LOG_DAEMON);
 /*
  * Disable hang-up signal.
  */
@@ -132,8 +129,8 @@ main(int argc, char **argv)
     if (setsid() < 0)
         sod_errx(EX_OSERR, "Can't set session identifier");
 
-    if (chdir(work_dir) < 0) 
-        sod_errx(EX_OSERR, "Can't change directory to %s", work_dir);
+    if (chdir(sod_work_dir) < 0) 
+        sod_errx(EX_OSERR, "Can't change directory to %s", sod_work_dir);
 
     (void)close(STDIN_FILENO);
     (void)close(STDOUT_FILENO);
@@ -155,18 +152,18 @@ main(int argc, char **argv)
 /*
  * Create SOD_PID_FILE (lockfile).
  */        
-    (void)unlink(pid_file);
+    (void)unlink(sod_pid_file);
         
-    if ((fd = open(pid_file, O_RDWR|O_CREAT, 0640)) < 0)
-        sod_errx(EX_OSERR, "Can't open %s", pid_file);
+    if ((fd = open(sod_pid_file, O_RDWR|O_CREAT, 0640)) < 0)
+        sod_errx(EX_OSERR, "Can't open %s", sod_pid_file);
 
     if (lockf(fd, F_TLOCK, 0) < 0)
-        sod_errx(EX_OSERR, "Can't lock %s", pid_file);
+        sod_errx(EX_OSERR, "Can't lock %s", sod_pid_file);
 
     (void)snprintf(lock_file, PATH_MAX, "%d\n", getpid());
 
     if (write(fd, lock_file, PATH_MAX) < 0) 
-        sod_errx(EX_OSERR, "Can't write %d in %s", getpid(), pid_file);
+        sod_errx(EX_OSERR, "Can't write %d in %s", getpid(), sod_pid_file);
         
     (void)close(fd);    
 /*
@@ -178,7 +175,7 @@ main(int argc, char **argv)
     sun->sun_family = AF_UNIX;
     len = sizeof(sun->sun_path);
 
-    (void)strncpy(sun->sun_path, sock_file, len - 1);
+    (void)strncpy(sun->sun_path, sod_sock_file, len - 1);
 
     len += offsetof(struct sockaddr_un, sun_path);
     
@@ -210,21 +207,25 @@ main(int argc, char **argv)
 }
 
 /*
- * Life-cycle of pam(8) transaction performed by child.
+ * By child performed pam(8) transaction.
  */
 static void     
 sod_doit(int s, int r)
 {
     struct sod_softc sc;
-    struct pam_conv     sc_pamc;     /* variable data */ 
-    struct passwd     *sc_pwd;   
     
-    login_cap_t *sc_lc;
+    char host[SOD_NMAX + 1];
+    char user[SOD_NMAX + 1];
+    
+    struct pam_conv     pamc;     /* variable data */ 
+    struct passwd     *pwd;   
+    
+    login_cap_t *lc;
    
     const char     *prompt;
     const char     *pw_prompt;
     
-    pam_handle_t     *sc_pamh;
+    pam_handle_t     *pamh;
     
     int retries, backoff;
     int ask = 1, cnt = 0;
@@ -232,29 +233,29 @@ sod_doit(int s, int r)
 
     (void)memset(&sc, 0, sizeof(sc));
     
-    sc.sc_sock_rmt = r;
-    sc.sc_sock_srv = s;
+    sc.sc_rmt = r;
+    sc.sc_srv = s;
     
     pamc.appdata_ptr = &sc;
     pamc.conv = sod_conv;
 /*
  * Create < hostname, user > tuple.
  */
-    if (sod_msg_fn(sod_msg_recv, sc.sc_sock_rmt, &sc.sc_buf) < 0) 
+    if (sod_msg_fn(sod_msg_recv, sc.sc_rmt, &sc.sc_buf) < 0) 
         goto out;
 
-    if (gethostname(sc.sc_host, SOD_NMAX) < 0) 
+    if (gethostname(host, SOD_NMAX) < 0) 
         goto out;    
  
-    (void)strncpy(sc.sc_user, sc.sc_buf.sm_tok, SOD_NMAX);
+    (void)strncpy(user, sc.sc_buf.sm_tok, SOD_NMAX);
 /*
  * Verify, if username exists in passwd database. 
  */
-    if ((sc.sc_pwd = getpwnam(sc.sc_user)) != NULL) {
+    if ((pwd = getpwnam(user)) != NULL) {
 /*
  * Verify, if user has UID 0, because login by UID 0 is not allowed. 
  */
-        if (sc.sc_pwd->pw_uid == (uid_t)0) 
+        if (pwd->pw_uid == (uid_t)0) 
             sc.sc_eval = PAM_PERM_DENIED;
         else
             sc.sc_eval = PAM_SUCCESS;
@@ -286,17 +287,15 @@ sod_doit(int s, int r)
 /*
  * Open pam(8) session and authenticate.
  */        
-            sc.sc_eval = pam_start(sod_name, sc.sc_user, 
+            sc.sc_eval = pam_start(sod_cmd, user, 
                 &pamc, &pamh);
 
             if (sc.sc_eval == PAM_SUCCESS) {
-                sc.sc_eval = pam_set_item(pamh, PAM_RUSER, 
-                    sc.sc_user);
+                sc.sc_eval = pam_set_item(pamh, PAM_RUSER, user);
             }
     
             if (sc.sc_eval == PAM_SUCCESS) {
-                sc.sc_eval = pam_set_item(pamh, PAM_RHOST, 
-                    sc.sc_host);
+                sc.sc_eval = pam_set_item(pamh, PAM_RHOST, host);
             }
            
             if (sc.sc_eval == PAM_SUCCESS) {
@@ -324,7 +323,7 @@ sod_doit(int s, int r)
                     ask = 0;    
             } else
                 ask = 0;    
-        }    
+        }
     }
 /*
  * Close pam(8) session, if any.
@@ -340,9 +339,9 @@ out:
     else 
         resp = SOD_AUTH_REJ; 
             
-    sod_msg_prepare(sc.sc_user, resp, &sc.sc_buf);
+    sod_msg_prepare(user, resp, &sc.sc_buf);
     
-    (void)sod_msg_fn(sod_msg_send, sc.sc_sock_rmt, &sc.sc_buf);
+    (void)sod_msg_fn(sod_msg_send, sc.sc_rmt, &sc.sc_buf);
     
     (void)memset(&sc, 0, sizeof(sc));
 
@@ -397,12 +396,12 @@ sod_conv(int num_msg, const struct pam_message **msg,
 /*
  * Request PAM_AUTHTOK.
  */                
-        if (sod_msg_fn(sod_msg_send, sc->sc_sock_rmt, &sc->sc_buf) < 0)
+        if (sod_msg_fn(sod_msg_send, sc->sc_rmt, &sc->sc_buf) < 0)
             break;
 /*
  * Await response from applicant.
  */    
-        if (sod_msg_fn(sod_msg_recv, sc->sc_sock_rmt, &sc->sc_buf) < 0)
+        if (sod_msg_fn(sod_msg_recv, sc->sc_rmt, &sc->sc_buf) < 0)
             break; 
             
         if (sc->sc_buf.sm_code != SOD_AUTH_REQ)
@@ -488,8 +487,8 @@ sod_errx(int eval, const char *fmt, ...)
 static void 
 sod_atexit(void)
 {
-    (void)unlink(sock_file);
-    (void)unlink(pid_file);
+    (void)unlink(sod_sock_file);
+    (void)unlink(sod_pid_file);
     
     closelog();
 }
