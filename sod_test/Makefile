@@ -1,4 +1,4 @@
-# Copyright 2015 Henning Matyschok.
+# Copyright 2015, 2016 Henning Matyschok.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -22,14 +22,14 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# version=0.2
+# version=0.3
 
 NO_MAN=
 
 PROG=	sod_test
 SRCS=	sod_test.c
 
-LDADD=	-lcobj -lthr
+LDADD=	-lcobj -llpthread
 
 .include <bsd.prog.mk>
 

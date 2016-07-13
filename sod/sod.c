@@ -60,13 +60,9 @@ struct sod_softc {
 static pid_t     pid;
 static pthread_t     tid;
 
-static char *sod_cmd; 
+static char *sod_progname;
 
-static char *sod_work_dir = SOD_WORK_DIR;
-static char *sod_pid_file = SOD_PID_FILE;
-static char *sod_sock_file = SOD_SOCK_FILE;
-
-static char     lock_file[PATH_MAX + 1];
+static char     sod_lock_file[PATH_MAX + 1];
 
 static struct sockaddr_storage     sap;
 static struct sockaddr_un *sun;
@@ -74,10 +70,9 @@ static size_t len;
 
 static sigset_t signalset;
 
-static char     *sod_prompt_default = SOD_PROMPT_DFLT;
-static char     *sod_pw_prompt_default = SOD_PW_PROMPT_DFLT;
+static char     sod_prompt_default[] = SOD_PROMPT_DFLT;
+static char     sod_pw_prompt_default[] = SOD_PW_PROMPT_DFLT;
 
-static void     sod_errx(int, const char *, ...);
 static void     sod_atexit(void);
 static void *    sod_sigaction(void *);
 
@@ -90,32 +85,41 @@ static void     sod_doit(int);
  * Fork.
  */
 int
-main(int argc, char **argv)
+main(int argc __unused, char **argv)
 {
     int fd;
     
-    if (getuid() != 0)
-        sod_errx(EX_NOPERM, "%s", strerror(EPERM));     
+    if (getuid() != 0) {
+        syslog(LOG_ERR, "%s", strerror(EPERM));
+        exit(EX_NOPERM);
+    }
     
-    if ((fd = open(sod_pid_file, O_RDWR, 0640)) > -1) 
-        sod_errx(EX_OSERR, "Daemon already running");    
-        
-    sod_cmd = argv[0];
+    if ((fd = open(SOD_PID_FILE, O_RDWR, 0640)) > -1) {
+        syslog(LOG_ERR, "Daemon already running");
+        exit(EX_OSERR);
+    }
+    sod_progname = argv[0];
     
-    openlog(sod_cmd, LOG_CONS, LOG_DAEMON);
+    openlog(sod_progname, LOG_CONS, LOG_DAEMON);
 /*
  * Disable hang-up signal.
  */
-    if (signal(SIGHUP, SIG_IGN) < 0)
-        sod_errx(EX_OSERR, "Can't disable SIGHUP");
+    if (signal(SIGHUP, SIG_IGN) < 0) {
+        syslog(LOG_ERR, "Can't disable SIGHUP");
+        exit(EX_OSERR);
+    }
 /*
  * Avoid creation of zombie processes.
  */
-    if (signal(SIGCHLD, SIG_IGN) < 0)
-        sod_errx(EX_OSERR, "Can't disable SIGCHLD");
-
-    if ((pid = fork()) < 0) 
-        sod_errx(EX_OSERR, "Can't fork");
+    if (signal(SIGCHLD, SIG_IGN) < 0) {
+        syslog(LOG_ERR, "Can't disable SIGCHILD");
+        exit(EX_OSERR);
+    }
+    
+    if ((pid = fork()) < 0) {
+        syslog(LOG_ERR, "Can't fork");
+        exit(EX_OSERR);
+    }
     
     if (pid != 0) 
         exit(EX_OK);
@@ -124,45 +128,62 @@ main(int argc, char **argv)
  */  
     (void)umask(0);
 
-    if (setsid() < 0)
-        sod_errx(EX_OSERR, "Can't set session identifier");
+    if (setsid() < 0) {
+        syslog(LOG_ERR, "Can't set session identifier");
+        exit(EX_OSERR);
+    }
 
-    if (chdir(sod_work_dir) < 0) 
-        sod_errx(EX_OSERR, "Can't change directory to %s", sod_work_dir);
-
+    if (chdir(SOD_WORK_DIR) < 0) { 
+        syslog(LOG_ERR, "Can't change directory to %s", SOD_WORK_DIR);
+        exit(EX_OSERR);
+    }
     (void)close(STDIN_FILENO);
     (void)close(STDOUT_FILENO);
     (void)close(STDERR_FILENO);
 
-    if (atexit(sod_atexit) < 0)
-        sod_errx(EX_OSERR, "Can't register sod_atexit");
+    if (atexit(sod_atexit) < 0) {
+        syslog(LOG_ERR, "Can't register sod_atexit");
+        exit(EX_OSERR);
+    }
 /* 
  * Modefy signal handling and externalize.
  */
-    if (sigfillset(&signalset) < 0)
-        sod_errx(EX_OSERR, "Can't initialize signal set");
-
-    if (pthread_sigmask(SIG_BLOCK, &signalset, NULL) != 0)
-        sod_errx(EX_OSERR, "Can't apply modefied signal set");    
+    if (sigfillset(&signalset) < 0) {
+        syslog(LOG_ERR, "Can't initialize signal set");
+        exit(EX_OSERR);
+    }
     
-    if (pthread_create(&tid, NULL, sod_sigaction, NULL) != 0)
-        sod_errx(EX_OSERR, "Can't initialize signal handler");
+    if (pthread_sigmask(SIG_BLOCK, &signalset, NULL) != 0) {
+        syslog(LOG_ERR, "Can't apply modefied signal set");    
+        exit(EX_OSERR);
+    }
+    
+    if (pthread_create(&tid, NULL, sod_sigaction, NULL) != 0) {
+        syslog(LOG_ERR, "Can't initialize signal handler");
+        exit(EX_OSERR);   
+    }
 /*
  * Create SOD_PID_FILE (lockfile).
  */        
-    (void)unlink(sod_pid_file);
+    (void)unlink(SOD_PID_FILE);
         
-    if ((fd = open(sod_pid_file, O_RDWR|O_CREAT, 0640)) < 0)
-        sod_errx(EX_OSERR, "Can't open %s", sod_pid_file);
+    if ((fd = open(SOD_PID_FILE, O_RDWR|O_CREAT, 0640)) < 0) {
+        syslog(LOG_ERR, "Can't open %s", SOD_PID_FILE);
+        exit(EX_OSERR);
+    }
+    
+    if (lockf(fd, F_TLOCK, 0) < 0) {
+        syslog(LOG_ERR, "Can't lock %s", SOD_PID_FILE);
+        exit(EX_OSERR);
+    }
 
-    if (lockf(fd, F_TLOCK, 0) < 0)
-        sod_errx(EX_OSERR, "Can't lock %s", sod_pid_file);
+    (void)snprintf(sod_lock_file, PATH_MAX, "%d\n", getpid());
 
-    (void)snprintf(lock_file, PATH_MAX, "%d\n", getpid());
-
-    if (write(fd, lock_file, PATH_MAX) < 0) 
-        sod_errx(EX_OSERR, "Can't write %d in %s", getpid(), sod_pid_file);
-        
+    if (write(fd, sod_lock_file, PATH_MAX) < 0) {
+        syslog(LOG_ERR, "Can't write %d in %s", getpid(), SOD_PID_FILE);
+        exit(EX_OSERR);   
+    }
+       
     (void)close(fd);    
 /*
  * Create listening socket.
@@ -173,20 +194,26 @@ main(int argc, char **argv)
     sun->sun_family = AF_UNIX;
     len = sizeof(sun->sun_path);
 
-    (void)strncpy(sun->sun_path, sod_sock_file, len - 1);
+    (void)strncpy(sun->sun_path, SOD_SOCK_FILE, len - 1);
 
     len += offsetof(struct sockaddr_un, sun_path);
     
-    if ((fd = socket(sun->sun_family, SOCK_STREAM, 0)) < 0) 
-        sod_errx(EX_OSERR, "Can't create socket");
+    if ((fd = socket(sun->sun_family, SOCK_STREAM, 0)) < 0) {
+        syslog(LOG_ERR, "Can't create socket");
+        exit(EX_OSERR);   
+    }
     
     (void)unlink(sun->sun_path);
 
-    if (bind(fd, (struct sockaddr *)sun, len) < 0)
-        sod_errx(EX_OSERR, "Can't bind %s", sun->sun_path);    
+    if (bind(fd, (struct sockaddr *)sun, len) < 0) {
+        syslog(LOG_ERR, "Can't bind %s", sun->sun_path);    
+        exit(EX_OSERR);   
+    }
         
-    if (listen(fd, SOD_MSG_QLEN) < 0) 
-        sod_errx(EX_OSERR, "Can't listen %s", sun->sun_path);
+    if (listen(fd, SOD_MSG_QLEN) < 0) { 
+        syslog(LOG_ERR, "Can't listen %s", sun->sun_path);
+        exit(EX_OSERR);
+    }
 /*
  * Wait until accept(2) and perform transaction.
  */
@@ -235,6 +262,7 @@ sod_doit(int r)
     
     pamc.appdata_ptr = &sc;
     pamc.conv = sod_conv;
+    pamh = NULL;
 /*
  * Create < hostname, user > tuple.
  */
@@ -284,7 +312,7 @@ sod_doit(int r)
 /*
  * Open pam(8) session and authenticate.
  */        
-                pam_err = pam_start(sod_cmd, user, 
+                pam_err = pam_start(sod_progname, user, 
                     &pamc, &pamh);
 
                 if (pam_err == PAM_SUCCESS) 
@@ -294,7 +322,7 @@ sod_doit(int r)
                     pam_err = pam_set_item(pamh, PAM_RHOST, host);
 
                 if (pam_err == PAM_SUCCESS) 
-                    pam_err = pam_set_item(pamh, PAM_TTY, sod_sock_file); 
+                    pam_err = pam_set_item(pamh, PAM_TTY, SOD_SOCK_FILE); 
 
                 if (pam_err == PAM_SUCCESS) {
 /*
@@ -340,7 +368,7 @@ sod_doit(int r)
 /*
  * Close session.
  */           
-            pam_err = pam_start(sod_cmd, user, &pamc, &pamh);
+            pam_err = pam_start(sod_progname, user, &pamc, &pamh);
 
             if (pam_err == PAM_SUCCESS) 
                 pam_err = pam_set_item(pamh, PAM_RUSER, user);
@@ -349,7 +377,7 @@ sod_doit(int r)
                 pam_err = pam_set_item(pamh, PAM_RHOST, host);
 
             if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_set_item(pamh, PAM_TTY, sod_sock_file); 
+                pam_err = pam_set_item(pamh, PAM_TTY, SOD_SOCK_FILE); 
 
             if (pam_err == PAM_SUCCESS) 
                 pam_err = pam_close_session(pamh, 0);
@@ -488,7 +516,7 @@ sod_sigaction(void *arg)
     
     for (;;) {
         if (sigwait(&signalset, &sig) != 0)
-            sod_errx(EX_OSERR, "Can't select signal set");
+            syslog(EX_OSERR, "Can't select signal set");
 
         switch (sig) {
         case SIGHUP:
@@ -501,21 +529,7 @@ sod_sigaction(void *arg)
             break;
         }    
     }    
-    return (NULL);
-}
-
-/*
- * Abnormal process termination.
- */
-static void     
-sod_errx(int eval, const char *fmt, ...)
-{
-    va_list ap;
-    
-    va_start(ap, fmt);
-    vsyslog(LOG_ERR, fmt, ap);
-    va_end(ap);    
-    exit(eval);
+    return (arg);
 }
 
 /*
