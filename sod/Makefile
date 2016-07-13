@@ -30,5 +30,7 @@ PROG=	sod
 SRCS=	sod.c
 MAN=    sod.8
 
+LDADD=	-lpam -lpthread
+
 .include <bsd.prog.mk>
 

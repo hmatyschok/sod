@@ -32,9 +32,14 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX    _POSIX_PATH_MAX
+#endif /* PATH_MAX */
 
 #define SOD_WORK_DIR     "/"
 #define SOD_PID_FILE     "/var/run/sod.pid"
@@ -64,7 +69,7 @@ typedef ssize_t     (*sod_msg_fn_t)(int, struct msghdr *, int);
 #define SOD_AUTH_ACK     (SOD_AUTH_REQ|SOD_MSG_ACK)
 #define SOD_AUTH_NAK     (SOD_AUTH_REQ|SOD_MSG_NAK)
 #define SOD_AUTH_REJ     (SOD_AUTH_REQ|SOD_MSG_REJ)
-#define    SOD_TERM_ACK     (SOD_TERM_REQ|SOD_MSG_ACK)
+#define SOD_TERM_ACK     (SOD_TERM_REQ|SOD_MSG_ACK)
 #define SOD_TERM_REJ     (SOD_TERM_REQ|SOD_MSG_REJ)
 
 static __inline struct sod_msg *     sod_msg_alloc(void);

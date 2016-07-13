@@ -29,6 +29,7 @@
 
 #include <security/pam_appl.h>
 
+#include <errno.h>
 #include <fcntl.h>
 #include <login_cap.h>
 #include <pthread.h>
@@ -46,10 +47,8 @@
  */
 
 struct sod_softc {
-    int     sc_srv;     /* fd, socket, applicant */
     struct sod_msg     sc_buf;     /* for transaction used buffer */
-    
-    
+    int     sc_rmt;     /* fd, socket, applicant */
     int     sc_eval;     /* tracks rv of pam(3) method calls */ 
 };
 #define    SOD_BACKOFF_DFLT     3
@@ -323,7 +322,9 @@ sod_doit(int r)
                 } else
                     ask = 0;    
             }
-
+/*
+ * open session.
+ */ 
             if (pam_err == PAM_SUCCESS) 
                 pam_err = pam_open_session(pamh, 0);
 /*
@@ -336,6 +337,9 @@ sod_doit(int r)
         
             break;
         case SOD_TERM_REQ:    
+/*
+ * Close session.
+ */           
             pam_err = pam_start(sod_cmd, user, &pamc, &pamh);
 
             if (pam_err == PAM_SUCCESS) 
