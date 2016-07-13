@@ -262,8 +262,6 @@ sod_doit(int r)
     
     endpwent(); 
     
-    resp = SOD_AUTH_REJ;
-    
     if (pam_err == PAM_SUCCESS) {
 /*
  * Parts of in login.c defined codesections are reused here.
@@ -333,7 +331,10 @@ sod_doit(int r)
  */             
             if (pam_err == PAM_SUCCESS) 
                 resp = SOD_AUTH_ACK;
+            else
+                resp = SOD_AUTH_REJ;    
         
+            break;
         case SOD_TERM_REQ:    
             pam_err = pam_start(sod_cmd, user, &pamc, &pamh);
 
@@ -350,22 +351,27 @@ sod_doit(int r)
                 pam_err = pam_close_session(pamh, 0);
 /*
  * Create response.
- */             
+ */         
             if (pam_err == PAM_SUCCESS) 
                 resp = SOD_TERM_ACK;
+            else
+                resp = SOD_TERM_REJ;
                   
             break;
         default:
+            resp = SOD_AUTH_REJ;
             break;
         }    
-    }          
+    } else 
+        resp = SOD_AUTH_REJ;         
 /*
  * Close pam(8) session, if any.
  */
     if (pamh != NULL)
         (void)pam_end(pamh, pam_err);  
-
-    
+/*
+ * Send response.
+ */      
     sod_msg_prepare(user, resp, &sc.sc_buf);
     
     (void)sod_msg_fn(sod_msg_send, sc.sc_rmt, &sc.sc_buf);
