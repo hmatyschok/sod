@@ -32,5 +32,6 @@ MAN=    sod.8
 
 LDADD=	-lpam -lpthread
 
+.include "../Makefile.inc"
 .include <bsd.prog.mk>
 
