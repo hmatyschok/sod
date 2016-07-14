@@ -43,8 +43,8 @@ Why is this a forking daemon using blocking streaming socket?
 
  | To hold the implementation as simple as possible.
  |
- | Any forked child provides for the transaction insulated 
- | contextby its Process Control Block.    
+ | Any forked child provides for the transaction  
+ | insulated context by its Process Control Block.    
 
  
 
