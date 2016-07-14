@@ -57,17 +57,7 @@ struct sod_softc {
 #define    SOD_PROMPT_DFLT        "login: "
 #define    SOD_PW_PROMPT_DFLT    "Password:"
 
-static pid_t     pid;
-static pthread_t     tid;
-
 static char *sod_progname;
-
-static char     sod_lock_file[PATH_MAX + 1];
-
-static struct sockaddr_storage     sap;
-static struct sockaddr_un *sun;
-static size_t len;
-
 static sigset_t signalset;
 
 static char     sod_prompt_default[] = SOD_PROMPT_DFLT;
@@ -87,6 +77,15 @@ static void     sod_doit(int);
 int
 main(int argc __unused, char **argv)
 {
+    pid_t     pid;
+    pthread_t     tid;
+
+    char sod_lock_file[PATH_MAX + 1];
+
+    struct sockaddr_storage     sap;
+    struct sockaddr_un *sun;
+    size_t len;
+
     int fd;
     
     if (getuid() != 0) {

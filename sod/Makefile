@@ -25,12 +25,13 @@
 #
 # version=0.3
 
+LDADD=	-lpam -lpthread
 
 PROG=	sod
 SRCS=	sod.c
+INCS=   sod.h
 MAN=    sod.8
 
-LDADD=	-lpam -lpthread
 
 .include "../Makefile.inc"
 .include <bsd.prog.mk>

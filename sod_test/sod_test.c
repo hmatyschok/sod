@@ -26,6 +26,7 @@
  */
 
 #include <err.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -45,17 +46,15 @@ struct sod_test_args {
     char     sta_user[SOD_NMAX + 1];
     char     sta_pw[SOD_NMAX + 1];
 };
+#define SOD_TEST_MAX_ARG    3
 
-static int     max_arg = 3;
-static char     *sock_file = SOD_SOCK_FILE;
-
-static char     cmd[SOD_NMAX + 1];
+static char     sod_test_progname[SOD_NMAX + 1];
 
 static struct sockaddr_storage     sap;
 static struct sockaddr_un *sun;
 static size_t len;
 
-static pthread_t     tid;
+static void *   sod_test(void *);
 
 /*
  * By pthread(3) called start routine.
@@ -165,6 +164,7 @@ main(int argc, char **argv)
     void *rv = NULL;
     struct sigaction sa;
     struct sod_test_args sta;
+    pthread_t tid;
     
     sa.sa_handler = SIG_IGN;
     (void)sigemptyset(&sa.sa_mask);
@@ -173,9 +173,9 @@ main(int argc, char **argv)
     if (sigaction(SIGCHLD, &sa, NULL) < 0)
         errx(EX_OSERR, "Can't disable SIGCHLD");
 
-    (void)strncpy(cmd, argv[0], SOD_NMAX);
+    (void)strncpy(sod_test_progname, argv[0], SOD_NMAX);
         
-    if (argc != max_arg)
+    if (argc != SOD_TEST_MAX_ARG)
         errx(EX_USAGE, "\nusage: %s user pw\n", argv[0]);
 /*
  * Cache arguments and prepare buffer.
@@ -191,7 +191,7 @@ main(int argc, char **argv)
     sun->sun_family = AF_UNIX;
     len = sizeof(sun->sun_path);
     
-    (void)strncpy(sun->sun_path, sock_file, len - 1);
+    (void)strncpy(sun->sun_path, SOD_SOCK_FILE, len - 1);
 
     len += offsetof(struct sockaddr_un, sun_path);
 /*

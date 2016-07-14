@@ -26,10 +26,10 @@
 
 NO_MAN=
 
+LDADD=  -lpthread
+
 PROG=	sod_test
 SRCS=	sod_test.c
-
-LDADD=	-lcobj -llpthread
 
 .include <bsd.prog.mk>
 
