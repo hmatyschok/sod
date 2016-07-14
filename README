@@ -27,8 +27,7 @@ credentials.
 Why was not libevent(3) used as proxy pattern performing 
 asynchronous I/O on non-blocking unix(4) domain socket?
 
- | Because to avoid dependencies on  
- | external libraries.
+ | Because to avoid dependencies on external libraries.
 
 Why was not used select(2) for aynchronous I/O? 
 
@@ -42,12 +41,7 @@ Why was not used kqueue(2)?
 
 Why is this a forking daemon using blocking streaming socket?
 
- | To hold the implementation as simple 
- | as possible.   
- |
- | Therefore, any child process maps to 
- | an uniqe Process Control Block which 
- | provides or describes an insulated 
- | context on asynchronous I/O events. 
+ | To hold the implementation as simple as possible.   
+
  
 

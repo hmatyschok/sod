@@ -223,7 +223,11 @@ main(int argc __unused, char **argv)
 
         if (fork() == 0) 
             sod_doit(rmt);
-                  
+/*
+ * Parent does not need open file descriptor
+ * denotes accepted connection, because child 
+ * performes transaction on inherited once.
+ */                  
         (void)close(rmt);
     }
             /* NOT REACHED */    
