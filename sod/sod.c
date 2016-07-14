@@ -49,7 +49,6 @@
 struct sod_softc {
     struct sod_msg     sc_buf;     /* for transaction used buffer */
     int     sc_rmt;     /* fd, socket, applicant */
-    int     sc_eval;     /* tracks rv of pam(3) method calls */ 
 };
 #define    SOD_BACKOFF_DFLT     3
 #define    SOD_RETRIES_DFLT     10

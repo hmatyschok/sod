@@ -36,7 +36,7 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#include <sod.h>
+#include "../sod/sod.h"
 
 /*
  * Simple test.
