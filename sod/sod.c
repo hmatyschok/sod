@@ -94,7 +94,7 @@ main(int argc __unused, char **argv)
     
     if ((fd = open(SOD_PID_FILE, O_RDWR, 0640)) > -1) {
         syslog(LOG_ERR, "Daemon already running");
-        exit(EX_OSERR);
+        exit(EX_OSFILE);
     }
     sod_progname = argv[0];
     
