@@ -28,12 +28,11 @@
 #include <err.h>
 #include <pthread.h>
 #include <signal.h>
-#include <stdarg.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sysexits.h>
-#include <syslog.h>
 #include <unistd.h>
 
 #include "../sod/sod.h"
@@ -98,22 +97,17 @@ sod_test(void *arg)
  * Send message.
  */         
             if (sod_msg_fn(sod_msg_send, s, buf) < 0) {
-                syslog(LOG_DEBUG, 
-                    "Can't send PAM_USER as request\n");
+                (void)printf("Can't send PAM_USER as request\n");
                 state = 0;
                 break;
             }
-            syslog(LOG_DEBUG, 
-                "tx: SOD_AUTH_REQ: %s\n", 
-                buf->sm_tok);        
+            
+            (void)printf("Send SOD_AUTH_REQ\n");        
 /*
  * Await response.
  */            
             if (sod_msg_fn(sod_msg_recv, s, buf) < 0) {
-                syslog(LOG_DEBUG, 
-                    "Can't receive "
-                    "SOD_AUTH_NAK "
-                    "as response");
+                (void)printf("Can't receive SOD_AUTH_NAK as response");
                 state = 0;
                 break;
             }
@@ -123,9 +117,7 @@ sod_test(void *arg)
             state = buf->sm_code;
             break;
         case SOD_AUTH_NAK:
-            syslog(LOG_DEBUG, 
-                "rx: SOD_AUTH_NAK: %s", 
-                buf->sm_tok);
+            (void)printf("Received SOD_AUTH_NAK\n");
 /*
  * Select for response need data.
  */        
@@ -133,13 +125,11 @@ sod_test(void *arg)
             tok = sta->sta_pw;    
             break;
         case SOD_AUTH_ACK:
-            syslog(LOG_DEBUG, 
-                "rx: SOD_AUTH_ACK: PAM_SUCCESS\n");
+            (void)printf("Received SOD_AUTH_ACK\n");
             state = 0;
             break;
         case SOD_AUTH_REJ:
-            syslog(LOG_DEBUG, 
-                "rx: SOD_AUTH_REJ: PAM_AUTH_ERR\n");
+            (void)printf("Received SOD_AUTH_REJ\n");
             state = 0;
             break;
         default:

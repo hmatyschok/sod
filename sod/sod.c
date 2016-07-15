@@ -97,7 +97,7 @@ main(int argc __unused, char **argv)
         exit(EX_OSFILE);
     }
     sod_progname = argv[0];
-    
+
     openlog(sod_progname, LOG_CONS, LOG_DAEMON);
 /*
  * Disable hang-up signal.
@@ -364,7 +364,7 @@ sod_doit(int r)
                 resp = SOD_AUTH_ACK;
             else
                 resp = SOD_AUTH_REJ;    
-        
+
             break;
         case SOD_TERM_REQ:    
 /*
@@ -411,10 +411,6 @@ sod_doit(int r)
     (void)sod_msg_fn(sod_msg_send, sc.sc_rmt, &sc.sc_buf);
 
     (void)memset(&sc, 0, sizeof(sc));
-
-#ifdef SOD_DEBUG        
-syslog(LOG_DEBUG, "%s\n", __func__);
-#endif /* SOD_DEBUG */ 
 
     exit(EX_OK);
 }
@@ -476,11 +472,7 @@ sod_conv(int num_msg, const struct pam_message **msg,
     
         if ((tok[i].resp = calloc(1, SOD_NMAX + 1)) == NULL) 
             break;
-            
-#ifdef SOD_DEBUG
-syslog(LOG_DEBUG, "%s: rx: %s\n", __func__, sc->sc_buf.sm_tok);    
-#endif /* SOD_DEBUG */    
-                
+   
         (void)strncpy(tok[i].resp, sc->sc_buf.sm_tok, SOD_NMAX);
         (void)memset(&sc->sc_buf, 0, sizeof(sc->sc_buf));
     }
