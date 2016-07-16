@@ -39,7 +39,8 @@ Why was not used kqueue(2)?
 
  | Because of portability.
 
-Why is this a forking daemon using blocking streaming socket?
+Why is this a forking daemon still using blocking 
+streaming socket in unix(4) domain?
 
  | To hold the implementation as simple as possible.
  |
