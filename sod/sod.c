@@ -276,11 +276,9 @@ sod_doit(int r)
 /*
  * Create < hostname, user > tuple.
  */
-    if (sod_msg_fn(sod_msg_recv, sc.sc_rmt, &sc.sc_buf) < 0) {
-        syslog(LOG_CONS, "%s: EX_OSERR: sock_rmt: %d\n", __func__, r); 
+    if (sod_msg_fn(sod_msg_recv, sc.sc_rmt, &sc.sc_buf) < 0)  
         exit(EX_OSERR);
-    }
-    
+
     if (gethostname(host, SOD_NMAX) < 0) 
         exit(EX_NOHOST); 
  
