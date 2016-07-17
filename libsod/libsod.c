@@ -83,7 +83,7 @@ sod_msg_recv(int s, struct sod_msg *sm, int flags)
 int
 sod_msg_fn(sod_msg_fn_t fn, int s, struct sod_msg *sm)
 {
-    if (sm != NULL) 
+    if (sm == NULL) 
         return (-1)
         
     if (fn == sod_msg_recv || fn == sod_msg_send) {
