@@ -41,8 +41,6 @@
 #define SOD_NMAX     127
 
 struct sod_msg {
-#define msg_id     msg_obj.co_id
-#define msg_len     msg_obj.co_len
     int     sm_code;     /* encodes request or response */
     char     sm_tok[SOD_NMAX + 1];
 };
