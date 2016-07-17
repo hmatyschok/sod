@@ -25,7 +25,7 @@
 #
 # version=0.3
 
-LDADD=	-lpam -lpthread -lsod
+LDADD=	-lpam -lpthread -lsod -lutil
 
 PROG=	sod
 SRCS=	sod.c

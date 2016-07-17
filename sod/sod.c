@@ -228,6 +228,7 @@ main(int argc __unused, char **argv)
             continue;        
 
         if (fork() == 0) {
+            (void)close(fd);
             sod_doit(rmt);
             exit(EX_OK);
         }    
@@ -276,9 +277,11 @@ sod_doit(int r)
 /*
  * Create < hostname, user > tuple.
  */
-    if (sod_msg_fn(sod_msg_recv, sc.sc_rmt, &sc.sc_buf) < 0)  
+    if (sod_msg_fn(sod_msg_recv, sc.sc_rmt, &sc.sc_buf) < 0) {
+        syslog(LOG_CONS, "%s: EX_OSERR: %s\n", __func__, strerror(errno)); 
         exit(EX_OSERR);
-
+    }
+ 
     if (gethostname(host, SOD_NMAX) < 0) 
         exit(EX_NOHOST); 
  
@@ -378,7 +381,7 @@ sod_doit(int r)
 /*
  * Close session.
  */           
-            pam_err = pam_start(sod_progname, user, &pamc, &pamh);
+            pam_err = pam_start("sod", user, &pamc, &pamh);
 
             if (pam_err == PAM_SUCCESS) 
                 pam_err = pam_set_item(pamh, PAM_RUSER, user);
