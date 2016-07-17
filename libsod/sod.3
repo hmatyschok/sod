@@ -29,8 +29,8 @@
 .Os
 .Sh NAME
 .Nm sod_msg_alloc ,
-.Nm sod_msg_free ,
 .Nm sod_msg_fn ,
+.Nm sod_msg_free ,
 .Nm sod_msg_prepare ,
 .Nm sod_msg_recv ,
 .Nm sod_msg_send 
@@ -39,6 +39,19 @@
 .Lb libsod
 .Sh SYNOPSIS
 .In sod.h
+
+.Ft struct sod_msg *
+.Fn sod_msg_alloc "void"
+
+.Ft ssize_t
+.Fn sod_msg_fn "sod_msg_fn_t fn" "int s" "struct sod_msg *sm"
+
+.Ft void
+.Fn sod_msg_free "struct sod_msg *sm"
+
+.Ft void
+.Fn sod_msg_prepare "const char *s" "int code" "struct sod_msg *sm"
+
 
 
 

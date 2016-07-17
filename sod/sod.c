@@ -325,8 +325,7 @@ sod_doit(int r)
 /*
  * Open pam(8) session and authenticate.
  */        
-                pam_err = pam_start("sod", user, 
-                    &pamc, &pamh);
+                pam_err = pam_start("sod", user, &pamc, &pamh);
 
                 if (pam_err == PAM_SUCCESS) 
                     pam_err = pam_set_item(pamh, PAM_RUSER, user);

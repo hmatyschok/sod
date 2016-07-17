@@ -93,6 +93,7 @@ sod_test(void *arg)
  */
         switch (state) {    
         case SOD_AUTH_REQ:
+        case SOD_TERM_REQ:
 /*
  * Create message.
  */ 
@@ -106,7 +107,10 @@ sod_test(void *arg)
                 break;
             }
             
-            (void)printf("Send SOD_AUTH_REQ\n");        
+            if (state == SOD_AUTH_REQ)
+                (void)printf("Send SOD_AUTH_REQ\n");
+            else
+                (void)printf("Send SOD_TERM_REQ\n");
 /*
  * Await response.
  */            
@@ -130,10 +134,19 @@ sod_test(void *arg)
             break;
         case SOD_AUTH_ACK:
             (void)printf("Received SOD_AUTH_ACK\n");
-            state = 0;
+            state = SOD_TERM_REQ;
+            tok = sta->st_user;
             break;
         case SOD_AUTH_REJ:
             (void)printf("Received SOD_AUTH_REJ\n");
+            state = 0;
+            break;
+        case SOD_TERM_ACK:
+            (void)printf("Received SOD_TERM_ACK\n");
+            state = 0;
+            break;
+        case SOD_TERM_REJ:
+            (void)printf("Received SOD_TERM_REJ\n");
             state = 0;
             break;
         default:
