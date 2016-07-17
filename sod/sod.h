@@ -86,12 +86,8 @@ static __inline void     sod_msg_free(struct sod_msg *);
 static __inline struct sod_msg * 
 sod_msg_alloc(void)
 {
-    struct sod_msg *sm;
-    
-    if ((sm = calloc(1, SOD_MSG_LEN)) != NULL) 
-        sm->sm_len = SOD_MSG_LEN;
 
-    return (sm);
+    return (calloc(1, SOD_MSG_LEN));
 }
 
 /*
@@ -103,8 +99,9 @@ sod_msg_prepare(const char *s, uint32_t code, struct sod_msg *sm)
     if (sm != NULL) {
         (void)memset(sm, 0, sizeof(*sm));
     
+        sm->sm_len = SOD_MSG_LEN;
         sm->sm_code = code;
-    
+  
         if (s != NULL) 
             (void)strncpy(sm->sm_tok, s, SOD_NMAX);
     }

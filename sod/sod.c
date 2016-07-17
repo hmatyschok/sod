@@ -97,8 +97,8 @@ main(int argc __unused, char **argv)
         exit(EX_OSFILE);
     }
     sod_progname = argv[0];
-
-    openlog(sod_progname, LOG_CONS, LOG_DAEMON);
+    
+    openlog(sod_progname, LOG_PID | LOG_CONS, LOG_AUTH);
 /*
  * Disable hang-up signal.
  */
@@ -221,13 +221,15 @@ main(int argc __unused, char **argv)
         if ((rmt = accept(fd, NULL, NULL)) < 0)
             continue;        
 
-        if (fork() == 0) 
+        if (fork() == 0) {
             sod_doit(rmt);
+            exit(EX_OK);
+        }    
 /*
- * Parent does not need open file descriptor
- * denotes accepted connection, because child 
- * performes transaction on inherited once.
- */                  
+ * Parent does not need an open file descriptor 
+ * denotes accepted connection, because child
+ * performs transaction on iherited once.
+ */     
         (void)close(rmt);
     }
             /* NOT REACHED */    
@@ -268,9 +270,11 @@ sod_doit(int r)
 /*
  * Create < hostname, user > tuple.
  */
-    if (sod_msg_fn(sod_msg_recv, sc.sc_rmt, &sc.sc_buf) < 0) 
+    if (sod_msg_fn(sod_msg_recv, sc.sc_rmt, &sc.sc_buf) < 0) {
+        syslog(LOG_CONS, "%s: EX_OSERR: sock_rmt: %d\n", __func__, r); 
         exit(EX_OSERR);
-
+    }
+    
     if (gethostname(host, SOD_NMAX) < 0) 
         exit(EX_NOHOST); 
  
@@ -411,8 +415,6 @@ sod_doit(int r)
     (void)sod_msg_fn(sod_msg_send, sc.sc_rmt, &sc.sc_buf);
 
     (void)memset(&sc, 0, sizeof(sc));
-
-    exit(EX_OK);
 }
 
 /*
@@ -472,6 +474,8 @@ sod_conv(int num_msg, const struct pam_message **msg,
     
         if ((tok[i].resp = calloc(1, SOD_NMAX + 1)) == NULL) 
             break;
+
+syslog(LOG_CONS, "%s: tok: %s\n", __func__, sc->sc_buf.sm_tok);    
    
         (void)strncpy(tok[i].resp, sc->sc_buf.sm_tok, SOD_NMAX);
         (void)memset(&sc->sc_buf, 0, sizeof(sc->sc_buf));
