@@ -25,6 +25,10 @@
  * version=0.3
  */
 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+
 #include <err.h>
 #include <pthread.h>
 #include <signal.h>
@@ -35,7 +39,7 @@
 #include <sysexits.h>
 #include <unistd.h>
 
-#include "../sod/sod.h"
+#include <sod.h>
 
 /*
  * Simple test.

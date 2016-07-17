@@ -24,12 +24,12 @@
 #
 # version=0.3
 
-NO_MAN=
-
-LDADD=  -lpthread
+LDADD=  -lpthread -lsod
 
 PROG=	sod_test
 SRCS=	sod_test.c
+
+NO_MAN=
 
 .include <bsd.prog.mk>
 

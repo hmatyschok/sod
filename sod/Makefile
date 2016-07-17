@@ -25,11 +25,10 @@
 #
 # version=0.3
 
-LDADD=	-lpam -lpthread -lutil
+LDADD=	-lpam -lpthread -lsod
 
 PROG=	sod
 SRCS=	sod.c
-INCS=   sod.h
 MAN=    sod.8
 
 .include "../Makefile.inc"

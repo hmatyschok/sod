@@ -25,7 +25,10 @@
  * version=0.3
  */
  
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/un.h> 
 
 #include <security/pam_appl.h>
 
@@ -37,10 +40,13 @@
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sysexits.h>
 #include <syslog.h>
+#include <unistd.h>
 
-#include "sod.h"
+#include <sod.h>
 
 /*
  * Simple sign-on service on demand daemon - sod(8).
