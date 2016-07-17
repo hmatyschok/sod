@@ -115,7 +115,7 @@ sod_test(void *arg)
  * Await response.
  */            
             if (sod_msg_fn(sod_msg_recv, s, buf) < 0) {
-                (void)printf("Can't receive SOD_AUTH_NAK as response");
+                (void)printf("Can't receive response");
                 state = 0;
                 break;
             }
