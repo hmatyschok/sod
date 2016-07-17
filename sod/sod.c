@@ -475,8 +475,6 @@ sod_conv(int num_msg, const struct pam_message **msg,
         if ((tok[i].resp = calloc(1, SOD_NMAX + 1)) == NULL) 
             break;
 
-syslog(LOG_CONS, "%s: tok: %s\n", __func__, sc->sc_buf.sm_tok);    
-   
         (void)strncpy(tok[i].resp, sc->sc_buf.sm_tok, SOD_NMAX);
         (void)memset(&sc->sc_buf, 0, sizeof(sc->sc_buf));
     }
