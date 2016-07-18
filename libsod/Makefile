@@ -29,7 +29,7 @@ LIB=	sod
 SHLIB_MAJOR=1
 SHLIB_MINOR=0
 
-SRCS=	libsod.c 
+SRCS=	sod_msg.c 
 
 INCS=	sod.h 
 
