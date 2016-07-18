@@ -62,11 +62,10 @@ struct sod_softc {
 #define    SOD_PROMPT_DFLT        "login: "
 #define    SOD_PW_PROMPT_DFLT    "Password:"
 
-static char *sod_progname;
-static sigset_t signalset;
+static sigset_t     signalset;
 
-static char     sod_prompt_default[] = SOD_PROMPT_DFLT;
-static char     sod_pw_prompt_default[] = SOD_PW_PROMPT_DFLT;
+static char     prompt_default[] = SOD_PROMPT_DFLT;
+static char     pw_prompt_default[] = SOD_PW_PROMPT_DFLT;
 
 static void     sod_atexit(void);
 static void *    sod_sigaction(void *);
@@ -102,9 +101,7 @@ main(int argc __unused, char **argv)
         syslog(LOG_ERR, "Daemon already running");
         exit(EX_OSFILE);
     }
-    sod_progname = argv[0];
-    
-    openlog(sod_progname, LOG_PID | LOG_CONS, LOG_AUTH);
+    openlog("sod", LOG_PID | LOG_CONS, LOG_AUTH);
 /*
  * Disable hang-up signal.
  */
@@ -124,7 +121,7 @@ main(int argc __unused, char **argv)
         syslog(LOG_ERR, "Can't fork");
         exit(EX_OSERR);
     }
-    
+  
     if (pid != 0) 
         exit(EX_OK);
 /*
@@ -144,11 +141,6 @@ main(int argc __unused, char **argv)
     (void)close(STDIN_FILENO);
     (void)close(STDOUT_FILENO);
     (void)close(STDERR_FILENO);
-
-    if (atexit(sod_atexit) < 0) {
-        syslog(LOG_ERR, "Can't register sod_atexit");
-        exit(EX_OSERR);
-    }
 /* 
  * Modefy signal handling and externalize.
  */
@@ -277,10 +269,8 @@ sod_doit(int r)
 /*
  * Create < hostname, user > tuple.
  */
-    if (sod_msg_fn(sod_msg_recv, sc.sc_rmt, &sc.sc_buf) < 0) {
-        syslog(LOG_CONS, "%s: EX_OSERR: %s\n", __func__, strerror(errno)); 
+    if (sod_msg_fn(sod_msg_recv, sc.sc_rmt, &sc.sc_buf) < 0) 
         exit(EX_OSERR);
-    }
  
     if (gethostname(host, SOD_NMAX) < 0) 
         exit(EX_NOHOST); 
@@ -311,9 +301,9 @@ sod_doit(int r)
       
             lc = login_getclass(NULL);
             prompt = login_getcapstr(lc, "login_prompt", 
-                sod_prompt_default, sod_prompt_default);
+                prompt_default, prompt_default);
             pw_prompt = login_getcapstr(lc, "passwd_prompt", 
-                sod_pw_prompt_default, sod_pw_prompt_default);
+                pw_prompt_default, pw_prompt_default);
             retries = login_getcapnum(lc, "login-retries", 
                 SOD_RETRIES_DFLT, SOD_RETRIES_DFLT);
             backoff = login_getcapnum(lc, "login-backoff", 
@@ -534,12 +524,3 @@ sod_sigaction(void *arg)
     return (arg);
 }
 
-/*
- * Close logfile on process termination. 
- */
-static void 
-sod_atexit(void)
-{
-
-    closelog();
-}
