@@ -67,7 +67,6 @@ static sigset_t     signalset;
 static char     prompt_default[] = SOD_PROMPT_DFLT;
 static char     pw_prompt_default[] = SOD_PW_PROMPT_DFLT;
 
-static void     sod_atexit(void);
 static void *    sod_sigaction(void *);
 
 static int     sod_conv(int, const struct pam_message **, 
