@@ -67,7 +67,7 @@ struct sod_msg *     sod_msg_alloc(void);
 void     sod_msg_prepare(const char *, int, struct sod_msg *);
 ssize_t     sod_msg_send(int, struct sod_msg *, int);
 ssize_t     sod_msg_recv(int, struct sod_msg *, int);
-int     sod_msg_fn(sod_msg_fn_t, int, struct sod_msg *);
+ssize_t     sod_msg_fn(sod_msg_fn_t, int, struct sod_msg *);
 void     sod_msg_free(struct sod_msg *);
 __END_DECLS
 

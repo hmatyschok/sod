@@ -80,15 +80,12 @@ sod_msg_recv(int s, struct sod_msg *sm, int flags)
 /* 
  * Performs MPI exchange via callback.  
  */
-int
+ssize_t
 sod_msg_fn(sod_msg_fn_t fn, int s, struct sod_msg *sm)
 {
-    if (sm == NULL) 
-        return (-1)
-        
-    if (fn == sod_msg_recv || fn == sod_msg_send) {
-        if ((*fn)(s, sm, 0) == sizeof(*sm))
-            return (0);    
+    if (sm != NULL) {
+        if (fn == sod_msg_recv || fn == sod_msg_send)
+            return ((*fn)(s, sm, 0)); 
     }
     return (-1);
 }
