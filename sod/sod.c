@@ -370,6 +370,32 @@ sod_doit(int r)
                 resp = SOD_AUTH_REJ;    
 
             break;
+        case SOD_PASSWD_REQ:
+/*
+ * Change password.
+ */           
+            pam_err = pam_start("sod", user, &pamc, &pamh);
+
+            if (pam_err == PAM_SUCCESS) 
+                pam_err = pam_set_item(pamh, PAM_RUSER, user);
+    
+            if (pam_err == PAM_SUCCESS) 
+                pam_err = pam_set_item(pamh, PAM_RHOST, host);
+
+            if (pam_err == PAM_SUCCESS) 
+                pam_err = pam_set_item(pamh, PAM_TTY, SOD_SOCK_FILE); 
+
+            if (pam_err == PAM_SUCCESS) 
+                pam_err = pam_chauthtok(pamh, 0);
+/*
+ * Create response.
+ */         
+            if (pam_err == PAM_SUCCESS) 
+                resp = SOD_PASSWD_ACK;
+            else
+                resp = SOD_PASSWD_REJ;
+       
+            break;
         case SOD_TERM_REQ:    
 /*
  * Close session.
