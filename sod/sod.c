@@ -540,19 +540,25 @@ sod_sigaction(void *arg)
     int sig;
     
     for (;;) {
-        if (sigwait(&signalset, &sig) != 0)
+/*
+ * Fall asleep until signal on signalset occours.
+ */        
+        if (sigwait(&signalset, &sig) == 0) { 
+        
+            switch (sig) {
+            case SIGHUP:
+            case SIGINT:
+            case SIGKILL:    
+            case SIGTERM:
+                exit(EX_OK);
+                break;
+            default:    
+                break;
+            }
+            
+        } else {
             syslog(EX_OSERR, "Can't select signal set");
-
-        switch (sig) {
-        case SIGHUP:
-        case SIGINT:
-        case SIGKILL:    
-        case SIGTERM:
-            exit(EX_OK);
-            break;
-        default:    
-            break;
-        }    
+        }
     }    
     return (arg);
 }
