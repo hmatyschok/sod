@@ -78,7 +78,7 @@ static void     sod_doit(int);
  * Fork.
  */
 int
-main(int argc __unused, char **argv)
+main(int argc __unused, char **argv __unused)
 {
     pid_t     pid;
     pthread_t     tid;
@@ -209,24 +209,31 @@ main(int argc __unused, char **argv)
         syslog(LOG_ERR, "Can't listen %s", sun->sun_path);
         exit(EX_OSERR);
     }
-/*
- * Wait until accept(2) and perform transaction.
- */
+
     for (;;) {
         int rmt;
-
+/*
+ * Wait until accept(2).
+ */
         if ((rmt = accept(fd, NULL, NULL)) < 0)
             continue;        
 
         if (fork() == 0) {
+/*
+ * Prohibit access by child on file descriptor
+ * denotes server socket(4) in unix(4) domain. 
+ */       
             (void)close(fd);
+/*
+ * Perform pam(8) transaction.
+ */
             sod_doit(rmt);
             exit(EX_OK);
         }    
 /*
  * Parent does not need an open file descriptor 
  * denotes accepted connection, because child
- * performs transaction on iherited once.
+ * performs pam(8) transaction on iherited once.
  */     
         (void)close(rmt);
     }
@@ -326,9 +333,7 @@ sod_doit(int r)
                     pam_err = pam_set_item(pamh, PAM_TTY, SOD_SOCK_FILE); 
 
                 if (pam_err == PAM_SUCCESS) {
-/*
- * Authenticate.
- */                
+                    
                     pam_err = pam_authenticate(pamh, 0);
                 
                     if (pam_err == PAM_AUTH_ERR) {                
@@ -352,7 +357,7 @@ sod_doit(int r)
                     ask = 0;    
             }
 /*
- * open session.
+ * Open session.
  */ 
             if (pam_err == PAM_SUCCESS) 
                 pam_err = pam_open_session(pamh, 0);
@@ -464,7 +469,16 @@ sod_conv(int num_msg, const struct pam_message **msg,
         if (sod_msg_fn(sod_msg_recv, sc->sc_rmt, &sc->sc_buf) < 0)
             break; 
             
-        if (sc->sc_buf.sm_code != SOD_AUTH_REQ)
+        switch (sc->sc_buf.sm_code) {
+        case SOD_AUTH_REQ:
+        case SOD_PASSWD_REQ:
+            break;
+        default:
+            style = -1;
+            break;
+        }        
+            
+        if (style < 0)
             break;
     
         if ((tok[i].resp = calloc(1, SOD_NMAX + 1)) == NULL) 

@@ -53,12 +53,18 @@ struct sod_msg {
 
 typedef ssize_t     (*sod_msg_fn_t)(int, struct sod_msg *, int);
 
-#define SOD_AUTH_REQ     0x00000001
-#define SOD_TERM_REQ     0x00000002
+#define SOD_AUTH_REQ    0x00000001
+#define SOD_PASSWD_REQ  0x00000002
+#define SOD_TERM_REQ     0x00000003
 
 #define SOD_AUTH_ACK     (SOD_AUTH_REQ|SOD_MSG_ACK)
 #define SOD_AUTH_NAK     (SOD_AUTH_REQ|SOD_MSG_NAK)
 #define SOD_AUTH_REJ     (SOD_AUTH_REQ|SOD_MSG_REJ)
+
+#define SOD_PASSWD_ACK     (SOD_PASSWD_REQ|SOD_MSG_ACK)
+#define SOD_PASSWD_NAK     (SOD_PASSWD_REQ|SOD_MSG_NAK)
+#define SOD_PASSWD_REJ     (SOD_PASSWD_REQ|SOD_MSG_REJ)
+
 #define SOD_TERM_ACK     (SOD_TERM_REQ|SOD_MSG_ACK)
 #define SOD_TERM_REJ     (SOD_TERM_REQ|SOD_MSG_REJ)
 
