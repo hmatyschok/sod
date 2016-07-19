@@ -62,16 +62,18 @@ struct sod_softc {
 #define    SOD_PROMPT_DFLT        "login: "
 #define    SOD_PW_PROMPT_DFLT    "Password:"
 
+static    struct sockaddr_storage     sap;
+static    struct sockaddr_un *sun;
+static    size_t len;
+
 static sigset_t     signalset;
 
 static char     prompt_default[] = SOD_PROMPT_DFLT;
 static char     pw_prompt_default[] = SOD_PW_PROMPT_DFLT;
 
 static void *    sod_sigaction(void *);
-
 static int     sod_conv(int, const struct pam_message **, 
     struct pam_response **, void *);
-
 static void     sod_doit(int);
 
 /*
@@ -82,13 +84,9 @@ main(int argc __unused, char **argv __unused)
 {
     pid_t     pid;
     pthread_t     tid;
-
-    char sod_lock_file[PATH_MAX + 1];
-
-    struct sockaddr_storage     sap;
-    struct sockaddr_un *sun;
-    size_t len;
-
+    
+    char sod_lockf_buf[PATH_MAX + 1];
+    
     int fd;
     
     if (getuid() != 0) {
@@ -160,8 +158,6 @@ main(int argc __unused, char **argv __unused)
 /*
  * Create SOD_PID_FILE (lockfile).
  */        
-    (void)unlink(SOD_PID_FILE);
-        
     if ((fd = open(SOD_PID_FILE, O_RDWR|O_CREAT, 0640)) < 0) {
         syslog(LOG_ERR, "Can't open %s", SOD_PID_FILE);
         exit(EX_OSERR);
@@ -172,9 +168,9 @@ main(int argc __unused, char **argv __unused)
         exit(EX_OSERR);
     }
 
-    (void)snprintf(sod_lock_file, PATH_MAX, "%d\n", getpid());
+    (void)snprintf(sod_lockf_buf, PATH_MAX, "%d\n", getpid());
 
-    if (write(fd, sod_lock_file, PATH_MAX) < 0) {
+    if (write(fd, sod_lockf_buf, PATH_MAX) < 0) {
         syslog(LOG_ERR, "Can't write %d in %s", getpid(), SOD_PID_FILE);
         exit(EX_OSERR);   
     }
@@ -498,7 +494,7 @@ sod_conv(int num_msg, const struct pam_message **msg,
         if (sod_msg_fn(sod_msg_recv, sc->sc_rmt, &sc->sc_buf) < 0)
             break; 
             
-        if (sc->sc_buf.sm_code != AUTH_REQ)
+        if (sc->sc_buf.sm_code != SOD_AUTH_REQ)
             break;
         
         if ((tok[i].resp = calloc(1, SOD_NMAX + 1)) == NULL) 
@@ -545,7 +541,7 @@ sod_sigaction(void *arg __unused)
  */        
         if (sigwait(&signalset, &sig) != 0) {
             syslog(EX_OSERR, "Can't select signal set");
-            exit(EX_OSERR):
+            exit(EX_OSERR);
         }
         
         switch (sig) {
@@ -553,6 +549,10 @@ sod_sigaction(void *arg __unused)
         case SIGINT:
         case SIGKILL:    
         case SIGTERM:
+            
+            (void)unlink(sun->sun_path);
+            (void)unlink(SOD_PID_FILE);
+            
             exit(EX_OK);
             break;
         default:    
