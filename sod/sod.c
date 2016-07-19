@@ -356,6 +356,29 @@ sod_doit(int r)
                 } else
                     ask = 0;    
             }
+            break;
+        case SOD_PASSWD_REQ:
+        case SOD_TERM_REQ:    
+        
+                /* FALLTHROUGH */
+           
+            pam_err = pam_start("sod", user, &pamc, &pamh);
+
+            if (pam_err == PAM_SUCCESS) 
+                pam_err = pam_set_item(pamh, PAM_RUSER, user);
+    
+            if (pam_err == PAM_SUCCESS) 
+                pam_err = pam_set_item(pamh, PAM_RHOST, host);
+
+            if (pam_err == PAM_SUCCESS) 
+                pam_err = pam_set_item(pamh, PAM_TTY, SOD_SOCK_FILE); 
+            break;
+        default:
+            break;
+        }
+        
+        switch (sc.sc_buf.sm_code) {
+        case SOD_AUTH_REQ:  
 /*
  * Open session.
  */ 
@@ -374,17 +397,6 @@ sod_doit(int r)
 /*
  * Change password.
  */           
-            pam_err = pam_start("sod", user, &pamc, &pamh);
-
-            if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_set_item(pamh, PAM_RUSER, user);
-    
-            if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_set_item(pamh, PAM_RHOST, host);
-
-            if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_set_item(pamh, PAM_TTY, SOD_SOCK_FILE); 
-
             if (pam_err == PAM_SUCCESS) 
                 pam_err = pam_chauthtok(pamh, 0);
 /*
@@ -400,17 +412,6 @@ sod_doit(int r)
 /*
  * Close session.
  */           
-            pam_err = pam_start("sod", user, &pamc, &pamh);
-
-            if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_set_item(pamh, PAM_RUSER, user);
-    
-            if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_set_item(pamh, PAM_RHOST, host);
-
-            if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_set_item(pamh, PAM_TTY, SOD_SOCK_FILE); 
-
             if (pam_err == PAM_SUCCESS) 
                 pam_err = pam_close_session(pamh, 0);
 /*
@@ -426,6 +427,7 @@ sod_doit(int r)
             resp = SOD_AUTH_REJ;
             break;
         }    
+                 
     } else 
         resp = SOD_AUTH_REJ;         
 /*
