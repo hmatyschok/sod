@@ -543,22 +543,21 @@ sod_sigaction(void *arg __unused)
 /*
  * Fall asleep until signal(3) on signalset occours.
  */        
-        if (sigwait(&signalset, &sig) == 0) { 
-        
-            switch (sig) {
-            case SIGHUP:
-            case SIGINT:
-            case SIGKILL:    
-            case SIGTERM:
-                exit(EX_OK);
-                break;
-            default:    
-                break;
-            }
-            
-        } else {
+        if (sigwait(&signalset, &sig) != 0) {
             syslog(EX_OSERR, "Can't select signal set");
+            exit(EX_OSERR):
         }
+        
+        switch (sig) {
+        case SIGHUP:
+        case SIGINT:
+        case SIGKILL:    
+        case SIGTERM:
+            exit(EX_OK);
+            break;
+        default:    
+            break;
+        } 
     }  
     
         /* NOT REACHED */    
