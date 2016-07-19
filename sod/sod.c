@@ -372,6 +372,7 @@ sod_doit(int r)
 
             if (pam_err == PAM_SUCCESS) 
                 pam_err = pam_set_item(pamh, PAM_TTY, SOD_SOCK_FILE); 
+            
             break;
         default:
             break;
@@ -497,18 +498,9 @@ sod_conv(int num_msg, const struct pam_message **msg,
         if (sod_msg_fn(sod_msg_recv, sc->sc_rmt, &sc->sc_buf) < 0)
             break; 
             
-        switch (sc->sc_buf.sm_code) {
-        case SOD_AUTH_REQ:
-        case SOD_PASSWD_REQ:
+        if (sc->sc_buf.sm_code != AUTH_REQ)
             break;
-        default:
-            style = -1;
-            break;
-        }        
-            
-        if (style < 0)
-            break;
-    
+        
         if ((tok[i].resp = calloc(1, SOD_NMAX + 1)) == NULL) 
             break;
 
