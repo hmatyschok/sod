@@ -532,16 +532,16 @@ sod_conv(int num_msg, const struct pam_message **msg,
 }
 
 /*
- * By pthread(3) encapsulated signal handler.
+ * By pthread(3) covered signal handler.
  */
 static void *
-sod_sigaction(void *arg)
+sod_sigaction(void *arg __unused)
 {
     int sig;
     
     for (;;) {
 /*
- * Fall asleep until signal on signalset occours.
+ * Fall asleep until signal(3) on signalset occours.
  */        
         if (sigwait(&signalset, &sig) == 0) { 
         
@@ -559,7 +559,10 @@ sod_sigaction(void *arg)
         } else {
             syslog(EX_OSERR, "Can't select signal set");
         }
-    }    
-    return (arg);
+    }  
+    
+        /* NOT REACHED */    
+                
+    return (NULL);
 }
 
