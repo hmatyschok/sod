@@ -55,7 +55,7 @@ typedef ssize_t     (*sod_msg_fn_t)(int, struct sod_msg *, int);
 
 #define SOD_AUTH_REQ    0x00000001
 #define SOD_PASSWD_REQ  0x00000002
-#define SOD_TERM_REQ     0x00000003
+#define SOD_TERM_REQ     0x00000004
 
 #define SOD_AUTH_ACK     (SOD_AUTH_REQ|SOD_MSG_ACK)
 #define SOD_AUTH_NAK     (SOD_AUTH_REQ|SOD_MSG_NAK)
