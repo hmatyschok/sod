@@ -62,14 +62,15 @@ struct sod_softc {
 #define    SOD_PROMPT_DFLT        "login: "
 #define    SOD_PW_PROMPT_DFLT    "Password:"
 
+static char     pid_file[] = SOD_PID_FILE;
+static char     prompt_default[] = SOD_PROMPT_DFLT;
+static char     pw_prompt_default[] = SOD_PW_PROMPT_DFLT;
+
 static    struct sockaddr_storage     sap;
 static    struct sockaddr_un *sun;
 static    size_t len;
 
 static sigset_t     signalset;
-
-static char     prompt_default[] = SOD_PROMPT_DFLT;
-static char     pw_prompt_default[] = SOD_PW_PROMPT_DFLT;
 
 static void *    sod_sigaction(void *);
 static int     sod_conv(int, const struct pam_message **, 
@@ -85,7 +86,7 @@ main(int argc __unused, char **argv __unused)
     pid_t     pid;
     pthread_t     tid;
     
-    char sod_lockf_buf[PATH_MAX + 1];
+    char pid_file_buf[PATH_MAX + 1];
     
     int fd;
     
@@ -94,11 +95,10 @@ main(int argc __unused, char **argv __unused)
         exit(EX_NOPERM);
     }
     
-    if ((fd = open(SOD_PID_FILE, O_RDWR, 0640)) > -1) {
+    if ((fd = open(pid_file, O_RDWR, 0640)) > -1) {
         syslog(LOG_ERR, "Daemon already running");
         exit(EX_OSFILE);
     }
-    openlog("sod", LOG_PID | LOG_CONS, LOG_AUTH);
 /*
  * Disable hang-up signal.
  */
@@ -156,22 +156,22 @@ main(int argc __unused, char **argv __unused)
         exit(EX_OSERR);   
     }
 /*
- * Create SOD_PID_FILE (lockfile).
+ * Create lockfile.
  */        
-    if ((fd = open(SOD_PID_FILE, O_RDWR|O_CREAT, 0640)) < 0) {
-        syslog(LOG_ERR, "Can't open %s", SOD_PID_FILE);
+    if ((fd = open(pid_file, O_RDWR|O_CREAT, 0640)) < 0) {
+        syslog(LOG_ERR, "Can't open %s", pid_file);
         exit(EX_OSERR);
     }
     
     if (lockf(fd, F_TLOCK, 0) < 0) {
-        syslog(LOG_ERR, "Can't lock %s", SOD_PID_FILE);
+        syslog(LOG_ERR, "Can't lock %s", pid_file);
         exit(EX_OSERR);
     }
 
-    (void)snprintf(sod_lockf_buf, PATH_MAX, "%d\n", getpid());
+    (void)snprintf(pid_file_buf, PATH_MAX, "%d\n", getpid());
 
-    if (write(fd, sod_lockf_buf, PATH_MAX) < 0) {
-        syslog(LOG_ERR, "Can't write %d in %s", getpid(), SOD_PID_FILE);
+    if (write(fd, pid_file_buf, PATH_MAX) < 0) {
+        syslog(LOG_ERR, "Can't write %d in %s", getpid(), pid_file);
         exit(EX_OSERR);   
     }
        
@@ -551,7 +551,7 @@ sod_sigaction(void *arg __unused)
         case SIGTERM:
             
             (void)unlink(sun->sun_path);
-            (void)unlink(SOD_PID_FILE);
+            (void)unlink(pid_file);
             
             exit(EX_OK);
             break;
