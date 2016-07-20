@@ -135,7 +135,7 @@ sod_test(void *arg)
         case SOD_AUTH_ACK:
             (void)printf("Received SOD_AUTH_ACK\n");
             state = SOD_TERM_REQ;
-            tok = sta->st_user;
+            tok = sta->sta_user;
             break;
         case SOD_AUTH_REJ:
             (void)printf("Received SOD_AUTH_REJ\n");

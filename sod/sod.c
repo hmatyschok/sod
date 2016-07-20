@@ -443,9 +443,7 @@ sod_doit(int r)
 }
 
 /*
- * By pam_vpromt(3) called conversation routine.
- * This event takes place during runtime of by
- * pam_authenticate(3) called pam_get_authtok(3).
+ * During runtime of pam_get_authtok(3) conversation routine.
  */
 static int 
 sod_conv(int num_msg, const struct pam_message **msg, 

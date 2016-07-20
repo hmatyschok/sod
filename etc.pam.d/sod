@@ -9,7 +9,7 @@ auth		required	pam_unix.so
 account		required	pam_deny.so
 
 # session
-session		required	pam_lastlogin.so
+session		required	pam_lastlog.so
 
 # password
 password	required	pam_unix.so
