@@ -36,7 +36,7 @@
 
 #define SOD_WORK_DIR     "/"
 #define SOD_PID_FILE     "/var/run/sod.pid"
-#define SOD_SOCK_FILE     "/var/run/sod.sock"
+#define SOD_SOCK_FILE     "/dev/sod.sock"
 
 #define SOD_NMAX     127
 
