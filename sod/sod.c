@@ -62,15 +62,22 @@ struct sod_softc {
 #define    SOD_PROMPT_DFLT        "login: "
 #define    SOD_PW_PROMPT_DFLT    "Password:"
 
+static pid_t     pid;
+static pthread_t     tid;
+
 static char     pid_file[] = SOD_PID_FILE;
-static char     prompt_default[] = SOD_PROMPT_DFLT;
-static char     pw_prompt_default[] = SOD_PW_PROMPT_DFLT;
+
+static char pid_file_buf[PATH_MAX + 1];
 
 static    struct sockaddr_storage     sap;
 static    struct sockaddr_un *sun;
 static    size_t len;
 
 static sigset_t     signalset;
+
+static char     prompt_default[] = SOD_PROMPT_DFLT;
+static char     pw_prompt_default[] = SOD_PW_PROMPT_DFLT;
+
 
 static void *    sod_sigaction(void *);
 static int     sod_conv(int, const struct pam_message **, 
@@ -83,11 +90,6 @@ static void     sod_doit(int);
 int
 main(int argc __unused, char **argv __unused)
 {
-    pid_t     pid;
-    pthread_t     tid;
-    
-    char pid_file_buf[PATH_MAX + 1];
-    
     int fd;
     
     if (getuid() != 0) {
@@ -352,12 +354,19 @@ sod_doit(int r)
                 } else
                     ask = 0;    
             }
+/*
+ * Create response.
+ */             
+            if (pam_err == PAM_SUCCESS) 
+                resp = SOD_AUTH_ACK;
+            else
+                resp = SOD_AUTH_REJ;    
+                
             break;
         case SOD_PASSWD_REQ:
-        case SOD_TERM_REQ:    
-        
-                /* FALLTHROUGH */
-           
+/*
+ * Change password.
+ */                       
             pam_err = pam_start("sod", user, &pamc, &pamh);
 
             if (pam_err == PAM_SUCCESS) 
@@ -367,33 +376,8 @@ sod_doit(int r)
                 pam_err = pam_set_item(pamh, PAM_RHOST, host);
 
             if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_set_item(pamh, PAM_TTY, SOD_SOCK_FILE); 
-            
-            break;
-        default:
-            break;
-        }
-        
-        switch (sc.sc_buf.sm_code) {
-        case SOD_AUTH_REQ:  
-/*
- * Open session.
- */ 
-            if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_open_session(pamh, 0);
-/*
- * Create response.
- */             
-            if (pam_err == PAM_SUCCESS) 
-                resp = SOD_AUTH_ACK;
-            else
-                resp = SOD_AUTH_REJ;    
+                pam_err = pam_set_item(pamh, PAM_TTY, sun->sun_path);       
 
-            break;
-        case SOD_PASSWD_REQ:
-/*
- * Change password.
- */           
             if (pam_err == PAM_SUCCESS) 
                 pam_err = pam_chauthtok(pamh, 0);
 /*
@@ -404,21 +388,6 @@ sod_doit(int r)
             else
                 resp = SOD_PASSWD_REJ;
        
-            break;
-        case SOD_TERM_REQ:    
-/*
- * Close session.
- */           
-            if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_close_session(pamh, 0);
-/*
- * Create response.
- */         
-            if (pam_err == PAM_SUCCESS) 
-                resp = SOD_TERM_ACK;
-            else
-                resp = SOD_TERM_REJ;
-                  
             break;
         default:
             resp = SOD_AUTH_REJ;

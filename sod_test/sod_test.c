@@ -66,7 +66,7 @@ void *
 sod_test(void *arg)
 {
     struct sod_test_args *sta;
-    struct sod_msg *buf;
+    struct sod_msg buf;
     int s, state;
     char *tok;
     
@@ -80,10 +80,7 @@ sod_test(void *arg)
     
     if (connect(s, (struct sockaddr *)sun, len) < 0)
         goto bad1;
-        
-    if ((buf = sod_msg_alloc()) == NULL)
-        goto bad2;
-    
+
     state = SOD_AUTH_REQ;
     tok = sta->sta_user;
     
@@ -93,15 +90,14 @@ sod_test(void *arg)
  */
         switch (state) {    
         case SOD_AUTH_REQ:
-        case SOD_TERM_REQ:
 /*
  * Create message.
  */ 
-            sod_msg_prepare(tok, state, buf);
+            sod_msg_prepare(tok, state, &buf);
 /*
  * Send message.
  */         
-            if (sod_msg_fn(sod_msg_send, s, buf) < 0) {
+            if (sod_msg_fn(sod_msg_send, s, &buf) < 0) {
                 (void)printf("Can't send PAM_USER as request\n");
                 state = 0;
                 break;
@@ -114,7 +110,7 @@ sod_test(void *arg)
 /*
  * Await response.
  */            
-            if (sod_msg_fn(sod_msg_recv, s, buf) < 0) {
+            if (sod_msg_fn(sod_msg_recv, s, &buf) < 0) {
                 (void)printf("Can't receive response");
                 state = 0;
                 break;
@@ -122,7 +118,7 @@ sod_test(void *arg)
 /*
  * Determine state transition.
  */
-            state = buf->sm_code;
+            state = buf.sm_code;
             break;
         case SOD_AUTH_NAK:
             (void)printf("Received SOD_AUTH_NAK\n");
@@ -134,19 +130,10 @@ sod_test(void *arg)
             break;
         case SOD_AUTH_ACK:
             (void)printf("Received SOD_AUTH_ACK\n");
-            state = SOD_TERM_REQ;
-            tok = sta->sta_user;
+            state = 0;
             break;
         case SOD_AUTH_REJ:
             (void)printf("Received SOD_AUTH_REJ\n");
-            state = 0;
-            break;
-        case SOD_TERM_ACK:
-            (void)printf("Received SOD_TERM_ACK\n");
-            state = 0;
-            break;
-        case SOD_TERM_REJ:
-            (void)printf("Received SOD_TERM_REJ\n");
             state = 0;
             break;
         default:
@@ -154,8 +141,6 @@ sod_test(void *arg)
             break;
         }
     }
-bad2:
-    sod_msg_free(buf);
 bad1:
     (void)close(s);
 bad:

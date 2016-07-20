@@ -36,7 +36,7 @@
 
 #define SOD_WORK_DIR     "/"
 #define SOD_PID_FILE     "/var/run/sod.pid"
-#define SOD_SOCK_FILE     "/dev/sod.sock"
+#define SOD_SOCK_FILE     "/var/run/sod.sock"
 
 #define SOD_NMAX     127
 
@@ -55,7 +55,6 @@ typedef ssize_t     (*sod_msg_fn_t)(int, struct sod_msg *, int);
 
 #define SOD_AUTH_REQ    0x00000001
 #define SOD_PASSWD_REQ  0x00000002
-#define SOD_TERM_REQ     0x00000004
 
 #define SOD_AUTH_ACK     (SOD_AUTH_REQ|SOD_MSG_ACK)
 #define SOD_AUTH_NAK     (SOD_AUTH_REQ|SOD_MSG_NAK)
@@ -64,8 +63,6 @@ typedef ssize_t     (*sod_msg_fn_t)(int, struct sod_msg *, int);
 #define SOD_PASSWD_ACK     (SOD_PASSWD_REQ|SOD_MSG_ACK)
 #define SOD_PASSWD_REJ     (SOD_PASSWD_REQ|SOD_MSG_REJ)
 
-#define SOD_TERM_ACK     (SOD_TERM_REQ|SOD_MSG_ACK)
-#define SOD_TERM_REJ     (SOD_TERM_REQ|SOD_MSG_REJ)
 
 __BEGIN_DECLS
 struct sod_msg *     sod_msg_alloc(void);
