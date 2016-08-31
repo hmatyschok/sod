@@ -79,9 +79,9 @@ sod_test(void *arg)
         goto bad;
     
     if (connect(s, (struct sockaddr *)sun, len) < 0)
-        goto bad1;
+        goto bad;
 
-    state = SOD_AUTH_REQ;
+    state = SOD_AUTH_REQ;+
     tok = sta->sta_user;
     
     while (state) {
@@ -141,8 +141,7 @@ sod_test(void *arg)
             break;
         }
     }
-bad1:
-    (void)close(s);
+
 bad:
     return (NULL);
 }

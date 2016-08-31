@@ -63,7 +63,6 @@ typedef ssize_t     (*sod_msg_fn_t)(int, struct sod_msg *, int);
 #define SOD_PASSWD_ACK     (SOD_PASSWD_REQ|SOD_MSG_ACK)
 #define SOD_PASSWD_REJ     (SOD_PASSWD_REQ|SOD_MSG_REJ)
 
-
 __BEGIN_DECLS
 struct sod_msg *     sod_msg_alloc(void);
 void     sod_msg_prepare(const char *, int, struct sod_msg *);
