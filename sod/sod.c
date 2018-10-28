@@ -56,11 +56,11 @@ struct sod_softc {
     struct sod_msg     sc_buf;     /* for transaction used buffer */
     int     sc_rmt;     /* fd, socket, applicant */
 };
-#define    SOD_BACKOFF_DFLT     3
-#define    SOD_RETRIES_DFLT     10
+#define SOD_DFLT_BACKOFF     3
+#define SOD_RETRIES_DFLT     10
 
-#define    SOD_PROMPT_DFLT        "login: "
-#define    SOD_PW_PROMPT_DFLT    "Password:"
+#define SOD_PROMPT_DFLT        "login: "
+#define SOD_DFLT_PW_PROMPT    "Password:"
 
 static pid_t     pid;
 static pthread_t     tid;
@@ -69,15 +69,14 @@ static char     pid_file[] = SOD_PID_FILE;
 
 static char pid_file_buf[PATH_MAX + 1];
 
-static    struct sockaddr_storage     sap;
-static    struct sockaddr_un *sun;
-static    size_t len;
+static struct sockaddr_storage     sap;
+static struct sockaddr_un *sun;
+static size_t len;
 
-static sigset_t     signalset;
+static sigset_t     nsigset;
 
 static char     prompt_default[] = SOD_PROMPT_DFLT;
-static char     pw_prompt_default[] = SOD_PW_PROMPT_DFLT;
-
+static char     pw_prompt_default[] = SOD_DFLT_PW_PROMPT;
 
 static void *    sod_sigaction(void *);
 static int     sod_conv(int, const struct pam_message **, 
@@ -143,12 +142,12 @@ main(int argc __unused, char **argv __unused)
 /* 
  * Modefy signal handling and externalize.
  */
-    if (sigfillset(&signalset) < 0) {
+    if (sigfillset(&nsigset) < 0) {
         syslog(LOG_ERR, "Can't initialize signal set");
         exit(EX_OSERR);
     }
     
-    if (pthread_sigmask(SIG_BLOCK, &signalset, NULL) != 0) {
+    if (pthread_sigmask(SIG_BLOCK, &nsigset, NULL) != 0) {
         syslog(LOG_ERR, "Can't apply modefied signal set");    
         exit(EX_OSERR);
     }
@@ -311,16 +310,15 @@ sod_doit(int r)
             retries = login_getcapnum(lc, "login-retries", 
                 SOD_RETRIES_DFLT, SOD_RETRIES_DFLT);
             backoff = login_getcapnum(lc, "login-backoff", 
-                SOD_BACKOFF_DFLT, SOD_BACKOFF_DFLT);
+                SOD_DFLT_BACKOFF, SOD_DFLT_BACKOFF);
             login_close(lc);
             lc = NULL;
        
             while (ask != 0) {
+				pam_err = pam_start("sod", user, &pamc, &pamh);
 /*
  * Open pam(8) session and authenticate.
  */        
-                pam_err = pam_start("sod", user, &pamc, &pamh);
-
                 if (pam_err == PAM_SUCCESS) 
                     pam_err = pam_set_item(pamh, PAM_RUSER, user);
     
@@ -335,11 +333,10 @@ sod_doit(int r)
                     pam_err = pam_authenticate(pamh, 0);
                 
                     if (pam_err == PAM_AUTH_ERR) {                
+						cnt += 1;
 /*
  * Reenter loop, if PAM_AUTH_ERR condition halts. 
- */
-                        cnt += 1;    
-        
+ */         
                         if (cnt > backoff) 
                             (void)sleep((u_int)((cnt - backoff) * 5));
         
@@ -366,20 +363,25 @@ sod_doit(int r)
         case SOD_PASSWD_REQ:
 /*
  * Change password.
- */                       
-            pam_err = pam_start("sod", user, &pamc, &pamh);
+ */
+			pam_err = pam_start("sod", user, &pamc, &pamh);
+            if (pam_err == PAM_SUCCESS) {
+                pam_err = pam_set_item(pamh, 
+					PAM_RUSER, user);
+                
+				if (pam_err == PAM_SUCCESS) { 
+					pam_err = pam_set_item(pamh, 
+						PAM_RHOST, host);
 
-            if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_set_item(pamh, PAM_RUSER, user);
-    
-            if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_set_item(pamh, PAM_RHOST, host);
+					if (pam_err == PAM_SUCCESS) { 
+						pam_err = pam_set_item(pamh, 
+							PAM_TTY, sun->sun_path);       
 
-            if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_set_item(pamh, PAM_TTY, sun->sun_path);       
-
-            if (pam_err == PAM_SUCCESS) 
-                pam_err = pam_chauthtok(pamh, 0);
+						if (pam_err == PAM_SUCCESS) 
+							pam_err = pam_chauthtok(pamh, 0);				
+					}
+				}
+			}
 /*
  * Create response.
  */         
@@ -504,9 +506,9 @@ sod_sigaction(void *arg __unused)
     
     for (;;) {
 /*
- * Fall asleep until signal(3) on signalset occours.
+ * Fall asleep until signal(3) on nsigset occours.
  */        
-        if (sigwait(&signalset, &sig) != 0) {
+        if (sigwait(&nsigset, &sig) != 0) {
             syslog(EX_OSERR, "Can't select signal set");
             exit(EX_OSERR);
         }

@@ -1,66 +1,48 @@
+
+<pre><code> 
+
 Simple sign-on service on demand daemon (sod)
----------------------------------------------
+=============================================
 
-This daemon provides (due to its early implementation status) only 
-simple user authentication throught providing an interface for the 
-backend of web-applications (or other funny things). 
+This daemon provides an interface for only simple user authentication. 
+Further, communication between backend and pam(8) is provided by use 
+of the socket API. Transactions are mapped in AF_UNIX domain. See 
 
-Further, communication between backend and pam(8) is provided by 
-using socket API. Transactions are mapped in AF_UNIX domain. See 
+ o https://www.freebsd.org/cgi/man.cgi?unix(4)
 
-<pre><code>
- https://www.freebsd.org/cgi/man.cgi?query=unix&manpath=FreeBSD+10.3-stable
-</code></pre>
-
-for further details. The use of IPC through socket(2) in unix(4) domain 
+for further details. Utilizing  IPC through socket(2) in unix(4) domain 
 provides strict isolation between the domain of given backend and pam(8) 
 subsystem. 
 
-<pre><code>
- https://www.freebsd.org/cgi/man.cgi?query=pam&manpath=FreeBSD+10.3-stable
-</code></pre>
+ o https://www.freebsd.org/cgi/man.cgi?pam(3)
 
 Now, it is up to the pam(8) subsystem to handle (or forward) service 
 requests targeting local user data base or remote sites managing user 
 credentials. 
 
-Why was not libevent(3) used as proxy pattern performing 
-asynchronous I/O on non-blocking unix(4) domain socket?
-
-<pre><code>
- Because to avoid dependencies on external libraries.
-</code></pre>
-
 Why was not used select(2) for aynchronous I/O? 
 
-<pre><code>
  Because select(2) scales terribly on
  large amounts by socket(2) allocated
  file descriptors.
-</code></pre>
 
-Why was not used kqueue(2)?
+Why there was not used kqueue(2)?
 
-<pre><code>
  Because of portability.
-</code></pre>
 
-Why is this a forking daemon still using blocking 
-streaming socket in unix(4) domain?
+Why is this a forking daemon still using blocking streaming socket 
+in unix(4) domain?
 
-<pre><code>
- To hold the implementation as simple as possible.
+ To reduce the complexity of the implementation.
  
  Any forked child provides for the transaction  
- insulated context by its Process Control Block.    
-</code></pre>
- 
+ insulated context by its Process control block.    
+
 Additional information about contacting
 ---------------------------------------
       
-If someone wants to contact me by electronic mail, please use encryption.
+If someone wants to contact me by electronic mail, use encryption!
 
-<pre><code>
 -----BEGIN PGP PUBLIC KEY BLOCK-----
 Version: GnuPG v2
 
@@ -92,6 +74,15 @@ u5E2GRq1FgrjmjTS8r+/zZfV31iFkIdc5gC9ipwBsA7H6Bx8lPP5M0l1MXS/wAWU
 8GZ4NRztiBU=
 =lsmx
 -----END PGP PUBLIC KEY BLOCK-----
-</code></pre>
 
-[![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=hmatyschok&url=https://github.com/hmatyschok/MeshBSD&title=MeshBSD&language=&tags=github&category=software) Please feel free to support me anytime.
+Otherwise, any connection attempt will be discarded. 
+
+This is a necessary security measure, because I would like to know 
+who is contacting me, because of this planet is full of individuals 
+whose are operating on one's own merits and this imply that this 
+planet is not a so called "Ponyhof", unfortunately. :)
+
+Feel free to support me by donations.
+</code></pre>
+[![Flattr this git repo](http://api.flattr.com/button/flattr-badge-large.png)](https://flattr.com/submit/auto?user_id=hmatyschok&url=https://github.com/hmatyschok/) 
+
