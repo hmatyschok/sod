@@ -218,7 +218,7 @@ main(int argc __unused, char **argv __unused)
         if (fork() == 0) {
 /*
  * Prohibit access by child on file descriptor
- * denotes server socket(4) in unix(4) domain. 
+ * denotes server socket(9) on unix(4) domain. 
  */       
             (void)close(fd);
 /*
